@@ -15,15 +15,7 @@ function addLine(items,product,variant,quantity){
   const qty=Math.max(0,Number(quantity)||0);
   if(!qty||!product||!variant)return;
   const idx=items.findIndex(x=>x.variantId===variant.id);
-  const line={
-    productKey:product.key,
-    productTitle:product.title,
-    variantId:variant.id,
-    variantTitle:variant.title,
-    price:Number(variant.price),
-    image:variant.image||product.image,
-    quantity:qty
-  };
+  const line={productKey:product.key,productTitle:product.title,variantId:variant.id,variantTitle:variant.title,price:Number(variant.price),image:variant.image||product.image,quantity:qty};
   if(idx<0)items.push(line);
   else items[idx]={...items[idx],quantity:items[idx].quantity+qty};
 }
@@ -39,65 +31,61 @@ function findSelect(card,label){
   return target?.querySelector('select')||null;
 }
 
+function renderControl(card,control){
+  const totalGels=Number(control.dataset.totalGels||0);
+  const selected=Math.max(0,Math.min(totalGels,Number(control.dataset.boost||0)));
+  control.dataset.boost=String(selected);
+  const count=control.querySelector('.boost-count');
+  const note=control.querySelector('.boost-swap-note');
+  if(count)count.textContent=String(selected);
+  if(note)note.textContent=`Suggested ${control.dataset.autoBoost||0} · ${totalGels-selected} regular gel${totalGels-selected===1?'':'s'} + ${selected} Boost`;
+
+  const gelCell=[...card.querySelectorAll('.training-tally-grid span')].find(el=>el.textContent?.toLowerCase().includes('gels'));
+  const boostCell=[...card.querySelectorAll('.training-tally-grid span')].find(el=>el.textContent?.toLowerCase().includes('boost'));
+  if(gelCell?.querySelector('b'))gelCell.querySelector('b').textContent=String(totalGels-selected);
+  if(boostCell?.querySelector('b'))boostCell.querySelector('b').textContent=String(selected);
+}
+
 function enhance(card){
-  const regular=findTallyValue(card,'Gels');
-  const boost=findTallyValue(card,'Boost');
-  const totalGels=regular.value+boost.value;
+  if(card.dataset.boostEnhanced==='1') return;
+  const regular=findTallyValue(card,'Gels').value;
+  const boost=findTallyValue(card,'Boost').value;
+  const totalGels=regular+boost;
   const grid=card.querySelector('.training-flavour-grid');
   if(!grid)return;
 
-  let control=grid.querySelector('.boost-swap-control');
-  const signature=`${totalGels}:${boost.value}`;
-  if(!control){
-    control=document.createElement('div');
-    control.className='boost-swap-control';
-    control.innerHTML=`
-      <div class="boost-swap-copy">
-        <span>Boost gels</span>
-        <small>100 mg caffeine each · replaces regular gels</small>
-      </div>
-      <div class="boost-swap-stepper">
-        <button type="button" class="boost-minus" aria-label="Use fewer Boost gels">−</button>
-        <b class="boost-count">0</b>
-        <button type="button" class="boost-plus" aria-label="Use more Boost gels">+</button>
-      </div>
-      <div class="boost-swap-note"></div>`;
-    grid.appendChild(control);
-  }
+  const control=document.createElement('div');
+  control.className='boost-swap-control';
+  control.dataset.totalGels=String(totalGels);
+  control.dataset.autoBoost=String(boost);
+  control.dataset.boost=String(boost);
+  control.innerHTML=`
+    <div class="boost-swap-copy">
+      <span>Boost gels</span>
+      <small>100 mg caffeine each · replaces regular gels</small>
+    </div>
+    <div class="boost-swap-stepper">
+      <button type="button" class="boost-minus" aria-label="Use fewer Boost gels">−</button>
+      <b class="boost-count">${boost}</b>
+      <button type="button" class="boost-plus" aria-label="Use more Boost gels">+</button>
+    </div>
+    <div class="boost-swap-note"></div>`;
+  grid.appendChild(control);
+  card.dataset.boostEnhanced='1';
 
-  if(control.dataset.signature!==signature){
-    control.dataset.signature=signature;
-    control.dataset.totalGels=String(totalGels);
-    control.dataset.autoBoost=String(boost.value);
-    control.dataset.boost=String(boost.value);
-  }
-
-  function render(){
-    const selected=Math.max(0,Math.min(Number(control.dataset.totalGels||0),Number(control.dataset.boost||0)));
-    control.dataset.boost=String(selected);
-    const count=control.querySelector('.boost-count');
-    const note=control.querySelector('.boost-swap-note');
-    if(count)count.textContent=String(selected);
-    if(note)note.textContent=`Suggested ${control.dataset.autoBoost||0} · ${Number(control.dataset.totalGels||0)-selected} regular gel${Number(control.dataset.totalGels||0)-selected===1?'':'s'} + ${selected} Boost`;
-    if(regular.cell?.querySelector('b'))regular.cell.querySelector('b').textContent=String(Number(control.dataset.totalGels||0)-selected);
-    if(boost.cell?.querySelector('b'))boost.cell.querySelector('b').textContent=String(selected);
-  }
-
-  const minus=control.querySelector('.boost-minus');
-  const plus=control.querySelector('.boost-plus');
-  if(minus&&!minus.dataset.bound){
-    minus.dataset.bound='1';
-    minus.addEventListener('click',()=>{control.dataset.boost=String(Math.max(0,Number(control.dataset.boost||0)-1));render();});
-  }
-  if(plus&&!plus.dataset.bound){
-    plus.dataset.bound='1';
-    plus.addEventListener('click',()=>{control.dataset.boost=String(Math.min(Number(control.dataset.totalGels||0),Number(control.dataset.boost||0)+1));render();});
-  }
-  render();
+  control.querySelector('.boost-minus')?.addEventListener('click',()=>{
+    control.dataset.boost=String(Math.max(0,Number(control.dataset.boost||0)-1));
+    renderControl(card,control);
+  });
+  control.querySelector('.boost-plus')?.addEventListener('click',()=>{
+    control.dataset.boost=String(Math.min(Number(control.dataset.totalGels||0),Number(control.dataset.boost||0)+1));
+    renderControl(card,control);
+  });
+  renderControl(card,control);
 }
 
 function enhanceAll(){
-  document.querySelectorAll('.training-tally-card').forEach(enhance);
+  document.querySelectorAll('.training-tally-card:not([data-boost-enhanced="1"])').forEach(enhance);
 }
 
 function customAddToBasket(button){
@@ -135,11 +123,17 @@ function customAddToBasket(button){
 }
 
 if(typeof window!=='undefined'){
-  const observer=new MutationObserver(()=>enhanceAll());
-  window.addEventListener('DOMContentLoaded',()=>{
-    enhanceAll();
-    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+  const scheduleEnhance=()=>window.requestAnimationFrame(enhanceAll);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',scheduleEnhance,{once:true});
+  else scheduleEnhance();
+
+  const observer=new MutationObserver(mutations=>{
+    const needsEnhance=mutations.some(m=>[...m.addedNodes].some(node=>node.nodeType===1&&(node.matches?.('.training-tally-card')||node.querySelector?.('.training-tally-card'))));
+    if(needsEnhance)scheduleEnhance();
   });
+  const startObserver=()=>observer.observe(document.body,{childList:true,subtree:true});
+  if(document.body)startObserver(); else document.addEventListener('DOMContentLoaded',startObserver,{once:true});
+
   document.addEventListener('click',event=>{
     const button=event.target.closest?.('.training-tally-add');
     if(!button)return;
