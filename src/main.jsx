@@ -16,6 +16,7 @@ import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
 import './training-simple-flow-v4';
+import './app-analytics';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
