@@ -7,6 +7,21 @@ let cache=[],cacheAt=0,scanQueued=false,loadingSessions=null;
 
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
 function niceDuration(seconds){const s=Math.max(0,Number(seconds)||0);if(s<60)return`${s}s`;const m=Math.round(s/60);return`${m} min`}
+function isAndroid(){return /Android/i.test(navigator.userAgent||'')}
+function crc32(bytes){let crc=0xffffffff;for(let i=0;i<bytes.length;i++){crc^=bytes[i];for(let j=0;j<8;j++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return(crc^0xffffffff)>>>0}
+function u16(n){return[n&255,(n>>>8)&255]}
+function u32(n){return[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}
+function zipSingleFile(filename,bytes){
+  const enc=new TextEncoder(),name=enc.encode(filename),crc=crc32(bytes),size=bytes.length;
+  const local=new Uint8Array(30+name.length+size);let p=0;
+  [0x50,0x4b,0x03,0x04,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(size),...u32(size),...u16(name.length),0,0].forEach(v=>local[p++]=v);
+  local.set(name,p);p+=name.length;local.set(bytes,p);
+  const central=new Uint8Array(46+name.length);p=0;
+  [0x50,0x4b,0x01,0x02,20,0,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(size),...u32(size),...u16(name.length),0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0].forEach(v=>central[p++]=v);
+  central.set(name,p);
+  const end=new Uint8Array([0x50,0x4b,0x05,0x06,0,0,0,0,1,0,1,0,...u32(central.length),...u32(local.length),0,0]);
+  return new Blob([local,central,end],{type:'application/zip'});
+}
 async function sessions(force=false){
   if(!force&&cache.length&&Date.now()-cacheAt<60000)return cache;
   if(loadingSessions)return loadingSessions;
@@ -32,12 +47,13 @@ function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className
 function fuelLine(s){const bits=[];if(Number(s.carb_target_gph)>0)bits.push(`${s.carb_target_gph} g carbs/h`);if(Number(s.bottle_mix_sachets)>0)bits.push(`${s.bottle_mix_sachets} Bottle Mix`);if(Number(s.regular_gels)>0)bits.push(`${s.regular_gels} gel${Number(s.regular_gels)===1?'':'s'}`);if(Number(s.boost_gels)>0)bits.push(`${s.boost_gels} Boost`);return bits.join(' · ')}
 function renderGarminGuide(body){
   const guide=el('div','workout-garmin-guide');
-  guide.append(el('strong','','Workout only — no route required'));
-  guide.append(el('p','','This file contains the workout steps only. Ride it on any route. Do not open the downloaded FIT file with Garmin Connect on your phone — Garmin Connect can treat external FIT files as Courses and ask for routing.'));
+  guide.append(el('strong','',isAndroid()?'Android: Garmin Connect cannot import workout FIT files directly':'Workout only — no route required'));
+  guide.append(el('p','',isAndroid()?'The ZIP prevents Garmin Connect from hijacking the FIT as a Course. Extract it, then copy the FIT file to Garmin/NewFiles. Do not open the FIT with Garmin Connect.':'This file contains workout steps only. Ride it on any route. Copy the FIT to Garmin/NewFiles; do not import it as a Course.'));
   const details=document.createElement('details');details.className='workout-garmin-howto';
   const summary=document.createElement('summary');summary.textContent='How to load it on Garmin';details.append(summary);
   const steps=document.createElement('ol');
-  ['Download the .FIT workout here.','Connect your Garmin device to a computer with USB.','Open the Garmin folder and copy the file into Garmin/NewFiles.','Safely disconnect and power on the Garmin. The session will be available under Workouts — no course or route is attached.'].forEach(x=>{const li=document.createElement('li');li.textContent=x;steps.append(li)});
+  const list=isAndroid()?['Download the ZIP from Just Fuel.','Extract the ZIP in My Files / Files.','Connect the Garmin device by USB to your phone or computer.','Copy the extracted .FIT file into Garmin/NewFiles.','Disconnect the Garmin. The session will appear under Workouts and can be ridden on any route.']:['Download the .FIT workout here.','Connect your Garmin device to a computer with USB.','Open the Garmin folder and copy the file into Garmin/NewFiles.','Safely disconnect and power on the Garmin. The session will be available under Workouts — no course or route is attached.'];
+  list.forEach(x=>{const li=document.createElement('li');li.textContent=x;steps.append(li)});
   details.append(steps);guide.append(details);body.append(guide);
 }
 function renderDetails(body,data,sessionRow){
@@ -55,16 +71,20 @@ function renderDetails(body,data,sessionRow){
   body.append(list);
   const fuel=fuelLine(sessionRow);if(fuel){const f=el('div','workout-fuel-line');f.append(el('span','','FUEL'),el('strong','',fuel));body.append(f)}
   if(data.downloadable!==false){
-    const btn=el('button','workout-fit-button');btn.type='button';btn.textContent='Download workout .FIT';
+    const android=isAndroid();
+    const btn=el('button','workout-fit-button');btn.type='button';btn.textContent=android?'Download Garmin workout ZIP':'Download workout .FIT';
     const result=el('div','workout-fit-result');result.hidden=true;
     btn.addEventListener('click',async()=>{
       if(btn.disabled)return;btn.disabled=true;const old=btn.textContent;btn.textContent='Creating workout file…';result.hidden=true;
       try{
-        const r=await callWorkout(data.session_id,'fit');const blob=await r.blob();const cd=r.headers.get('content-disposition')||'';const match=cd.match(/filename="?([^";]+)"?/i);
-        const a=document.createElement('a');a.href=window.URL.createObjectURL(blob);a.download=match?.[1]||'just-fuel-workout.fit';a.style.display='none';document.body.append(a);a.click();
-        setTimeout(()=>{window.URL.revokeObjectURL(a.href);a.remove()},2000);
-        btn.textContent='Workout .FIT downloaded';result.textContent='Downloaded as a structured workout. Do not open it in Garmin Connect as a Course. Copy it to Garmin/NewFiles to use it on any route.';result.hidden=false;
-        setTimeout(()=>{btn.textContent=old},2600);
+        const r=await callWorkout(data.session_id,'fit');const fitBlob=await r.blob();const cd=r.headers.get('content-disposition')||'';const match=cd.match(/filename="?([^";]+)"?/i);const fitName=match?.[1]||'just-fuel-workout.fit';
+        let blob=fitBlob,downloadName=fitName;
+        if(android){blob=zipSingleFile(fitName,new Uint8Array(await fitBlob.arrayBuffer()));downloadName=fitName.replace(/\.fit$/i,'')+'-garmin-workout.zip'}
+        const a=document.createElement('a');a.href=window.URL.createObjectURL(blob);a.download=downloadName;a.style.display='none';document.body.append(a);a.click();
+        setTimeout(()=>{window.URL.revokeObjectURL(a.href);a.remove()},2500);
+        btn.textContent=android?'Garmin workout ZIP downloaded':'Workout .FIT downloaded';
+        result.textContent=android?'ZIP downloaded. Extract it and copy the .FIT file to Garmin/NewFiles. Do not open the FIT with Garmin Connect — that launches Course Setup.':'Workout FIT downloaded. Copy it to Garmin/NewFiles. Do not import it through Garmin Connect Courses.';result.hidden=false;
+        setTimeout(()=>{btn.textContent=old},3000);
       }catch(e){btn.textContent=e?.message||'Download failed';result.textContent='The workout could not be downloaded. Please try again.';result.hidden=false;setTimeout(()=>btn.textContent=old,2800)}finally{btn.disabled=false}
     });
     body.append(btn,result);renderGarminGuide(body);
