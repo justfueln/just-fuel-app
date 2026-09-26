@@ -16,19 +16,5 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      const fixOtpField = () => {
-        const input = document.querySelector('input[inputmode="numeric"][maxlength="6"]');
-        if (input) {
-          input.maxLength = 10;
-          input.placeholder = 'Login code';
-        }
-        document.querySelectorAll('button').forEach((button) => {
-          if (button.textContent.trim() === 'Send 6-digit code') button.textContent = 'Send login code';
-        });
-      };
-      new MutationObserver(fixOtpField).observe(document.documentElement, { childList: true, subtree: true });
-      window.addEventListener('DOMContentLoaded', fixOtpField);
-    </script>
   </body>
 </html>
