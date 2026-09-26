@@ -5,6 +5,7 @@ import Shell from './Shell';
 import './styles.css';
 import './shell.css';
 import './basket.css';
+import './basketBridge';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
