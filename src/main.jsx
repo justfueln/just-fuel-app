@@ -1,8 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
-import App from './App';
+import Shell from './Shell';
 import './styles.css';
+import './shell.css';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -15,5 +16,5 @@ if ('serviceWorker' in navigator) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><App /></React.StrictMode>
+  <React.StrictMode><Shell /></React.StrictMode>
 );
