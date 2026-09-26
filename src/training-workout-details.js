@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-const URL='https://ufolqntrfmvefpvrjnsa.supabase.co';
+const SUPABASE_URL='https://ufolqntrfmvefpvrjnsa.supabase.co';
 const KEY='sb_publishable_dQVErA2uFoym91L-vsW-kw_n6dWJfqy';
-const sb=createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const sb=createClient(SUPABASE_URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
 let cache=[],cacheAt=0,scanQueued=false,loadingSessions=null;
 
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
@@ -21,7 +21,7 @@ async function sessions(force=false){
 }
 async function callWorkout(sessionId,format='json'){
   const{data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('Please sign in again.');
-  const r=await fetch(`${URL}/functions/v1/training-workout-fit`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId,format})});
+  const r=await fetch(`${SUPABASE_URL}/functions/v1/training-workout-fit`,{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId,format})});
   if(format==='fit'){
     if(!r.ok){let msg='Could not create FIT workout.';try{const j=await r.json();msg=j.error||msg}catch{}throw new Error(msg)}
     return r;
@@ -38,7 +38,7 @@ function renderDetails(body,data,sessionRow){
   const list=el('div','workout-step-list');
   (data.steps||[]).forEach((s,i)=>{const row=el('div','workout-step-row');row.append(el('span','workout-step-number',String(i+1)));const copy=el('div','workout-step-copy');const top=el('div','workout-step-top');top.append(el('strong','',s.name),el('b','',niceDuration(s.seconds)));copy.append(top);const target=s.powerLow&&s.powerHigh?`${s.powerLow}–${s.powerHigh} W`:s.intensity==='rest'?'Easy recovery':'Open effort';copy.append(el('span','workout-step-target',target));if(s.notes)copy.append(el('small','',s.notes));row.append(copy);list.append(row)});body.append(list);
   const fuel=fuelLine(sessionRow);if(fuel){const f=el('div','workout-fuel-line');f.append(el('span','','FUEL'),el('strong','',fuel));body.append(f)}
-  if(data.downloadable!==false){const btn=el('button','workout-fit-button');btn.type='button';btn.textContent='Download Garmin FIT workout';btn.addEventListener('click',async()=>{if(btn.disabled)return;btn.disabled=true;const old=btn.textContent;btn.textContent='Creating FIT file…';try{const r=await callWorkout(data.session_id,'fit');const blob=await r.blob();const cd=r.headers.get('content-disposition')||'';const match=cd.match(/filename="?([^";]+)"?/i);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=match?.[1]||`just-fuel-workout.fit`;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);btn.textContent='FIT downloaded';setTimeout(()=>btn.textContent=old,1800)}catch(e){btn.textContent=e?.message||'Download failed';setTimeout(()=>btn.textContent=old,2500)}finally{btn.disabled=false}});body.append(btn);body.append(el('small','workout-fit-note','Structured FIT workout for compatible Garmin devices.'))}
+  if(data.downloadable!==false){const btn=el('button','workout-fit-button');btn.type='button';btn.textContent='Download Garmin FIT workout';btn.addEventListener('click',async()=>{if(btn.disabled)return;btn.disabled=true;const old=btn.textContent;btn.textContent='Creating FIT file…';try{const r=await callWorkout(data.session_id,'fit');const blob=await r.blob();const cd=r.headers.get('content-disposition')||'';const match=cd.match(/filename=\"?([^\";]+)\"?/i);const a=document.createElement('a');const objectUrl=window.URL.createObjectURL(blob);a.href=objectUrl;a.download=match?.[1]||`just-fuel-workout.fit`;document.body.append(a);a.click();setTimeout(()=>{window.URL.revokeObjectURL(objectUrl);a.remove()},1500);btn.textContent='FIT downloaded';setTimeout(()=>btn.textContent=old,1800)}catch(e){btn.textContent=e?.message||'Download failed';setTimeout(()=>btn.textContent=old,2500)}finally{btn.disabled=false}});body.append(btn);body.append(el('small','workout-fit-note','Structured FIT workout for compatible Garmin devices.'))}
 }
 function addEnhancement(card,row){
   if(card.dataset.jfWorkoutEnhanced==='1')return;card.dataset.jfWorkoutEnhanced='1';card.dataset.jfSessionId=row.id;
