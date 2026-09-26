@@ -10,8 +10,10 @@ import './training-fixes.css';
 import './training-fuel.css';
 import './training-boost-control.css';
 import './season-v3.css';
+import './training-workout-details.css';
 import './basketBridge';
 import './training-boost-control';
+import './training-workout-details';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
