@@ -1,0 +1,9 @@
+{
+  "name":"Just Fuel",
+  "short_name":"Just Fuel",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#080808",
+  "theme_color":"#0b0b0b",
+  "description":"Just Fuel training, race and fueling planner"
+}
