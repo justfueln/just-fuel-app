@@ -8,7 +8,9 @@ import './shell-v3.css';
 import './reminder-v2.css';
 import './training-fixes.css';
 import './training-fuel.css';
+import './training-boost-control.css';
 import './basketBridge';
+import './training-boost-control';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
