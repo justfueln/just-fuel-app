@@ -5,6 +5,7 @@ import ShellNextV2 from './ShellNextV2';
 import './styles.css';
 import './shell-next.css';
 import './reminder-v2.css';
+import './training-fixes.css';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
