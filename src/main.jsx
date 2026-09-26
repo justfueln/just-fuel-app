@@ -12,10 +12,12 @@ import './training-boost-control.css';
 import './season-v3.css';
 import './training-workout-details.css';
 import './training-simple-flow-v4.css';
+import './training-feedback.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
 import './training-simple-flow-v4';
+import './training-feedback';
 import './app-analytics';
 
 export const supabase = createClient(
