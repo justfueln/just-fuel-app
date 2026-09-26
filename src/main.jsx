@@ -1,9 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
-import ShellNext from './ShellNext';
+import ShellNextV2 from './ShellNextV2';
 import './styles.css';
 import './shell-next.css';
+import './reminder-v2.css';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -16,5 +17,5 @@ if ('serviceWorker' in navigator) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><ShellNext /></React.StrictMode>
+  <React.StrictMode><ShellNextV2 /></React.StrictMode>
 );
