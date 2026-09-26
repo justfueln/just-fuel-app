@@ -9,6 +9,7 @@ import './reminder-v2.css';
 import './training-fixes.css';
 import './training-fuel.css';
 import './training-boost-control.css';
+import './season-v3.css';
 import './basketBridge';
 import './training-boost-control';
 
