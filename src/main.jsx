@@ -6,6 +6,8 @@ import './styles.css';
 import './shell-next.css';
 import './reminder-v2.css';
 import './training-fixes.css';
+import './training-fuel.css';
+import './basketBridge';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
