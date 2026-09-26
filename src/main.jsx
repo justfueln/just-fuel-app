@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import Shell from './Shell';
 import './styles.css';
 import './shell.css';
+import './basket.css';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
