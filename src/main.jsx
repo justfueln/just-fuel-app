@@ -1,11 +1,9 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
-import Shell from './Shell';
+import ShellNext from './ShellNext';
 import './styles.css';
-import './shell.css';
-import './basket.css';
-import './basketBridge';
+import './shell-next.css';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -18,5 +16,5 @@ if ('serviceWorker' in navigator) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><Shell /></React.StrictMode>
+  <React.StrictMode><ShellNext /></React.StrictMode>
 );
