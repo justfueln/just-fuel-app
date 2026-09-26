@@ -20,10 +20,18 @@ function addLine(items,product,variant,quantity){
   else items[idx]={...items[idx],quantity:items[idx].quantity+qty};
 }
 
-function findTallyValue(card,label){
-  const cell=[...card.querySelectorAll('.training-tally-grid span')].find(el=>el.textContent?.toLowerCase().includes(label.toLowerCase()));
+function tallyCell(card,label){
+  return [...card.querySelectorAll('.training-tally-grid span')].find(el=>{
+    const text=(el.textContent||'').trim().toLowerCase();
+    if(label==='gels') return text.endsWith('gels') && !text.includes('boost');
+    return text.includes(label.toLowerCase());
+  })||null;
+}
+
+function tallyValue(card,label){
+  const cell=tallyCell(card,label);
   const value=Number(cell?.querySelector('b')?.textContent||0);
-  return {cell,value:Number.isFinite(value)?value:0};
+  return Number.isFinite(value)?value:0;
 }
 
 function findSelect(card,label){
@@ -31,57 +39,90 @@ function findSelect(card,label){
   return target?.querySelector('select')||null;
 }
 
+function currentPlanGelTotal(card){
+  return Math.max(0,tallyValue(card,'gels')+tallyValue(card,'boost'));
+}
+
+function syncControlFromTally(card,control,{resetSelection=false}={}){
+  const regular=tallyValue(card,'gels');
+  const suggestedBoost=tallyValue(card,'boost');
+  const total=Math.max(0,regular+suggestedBoost);
+  if(total>0){
+    control.dataset.totalGels=String(total);
+    control.dataset.autoBoost=String(suggestedBoost);
+    if(resetSelection||control.dataset.touched!=='1') control.dataset.boost=String(suggestedBoost);
+  }
+}
+
 function renderControl(card,control){
-  const totalGels=Number(control.dataset.totalGels||0);
+  const totalGels=Math.max(0,Number(control.dataset.totalGels||0));
   const selected=Math.max(0,Math.min(totalGels,Number(control.dataset.boost||0)));
   control.dataset.boost=String(selected);
   const count=control.querySelector('.boost-count');
   const note=control.querySelector('.boost-swap-note');
   if(count)count.textContent=String(selected);
-  if(note)note.textContent=`Suggested ${control.dataset.autoBoost||0} · ${totalGels-selected} regular gel${totalGels-selected===1?'':'s'} + ${selected} Boost`;
-
-  const gelCell=[...card.querySelectorAll('.training-tally-grid span')].find(el=>el.textContent?.toLowerCase().includes('gels'));
-  const boostCell=[...card.querySelectorAll('.training-tally-grid span')].find(el=>el.textContent?.toLowerCase().includes('boost'));
-  if(gelCell?.querySelector('b'))gelCell.querySelector('b').textContent=String(totalGels-selected);
-  if(boostCell?.querySelector('b'))boostCell.querySelector('b').textContent=String(selected);
+  if(note){
+    const regular=Math.max(0,totalGels-selected);
+    note.textContent=`Plan has ${totalGels} gel unit${totalGels===1?'':'s'} · basket split: ${regular} regular + ${selected} Boost`;
+  }
 }
 
 function enhance(card){
   if(card.dataset.boostEnhanced==='1') return;
-  const regular=findTallyValue(card,'Gels').value;
-  const boost=findTallyValue(card,'Boost').value;
-  const totalGels=regular+boost;
   const grid=card.querySelector('.training-flavour-grid');
   if(!grid)return;
 
+  const regular=tallyValue(card,'gels');
+  const suggestedBoost=tallyValue(card,'boost');
+  const initialTotal=Math.max(0,regular+suggestedBoost);
+
   const control=document.createElement('div');
   control.className='boost-swap-control';
-  control.dataset.totalGels=String(totalGels);
-  control.dataset.autoBoost=String(boost);
-  control.dataset.boost=String(boost);
+  control.dataset.totalGels=String(initialTotal);
+  control.dataset.autoBoost=String(suggestedBoost);
+  control.dataset.boost=String(suggestedBoost);
+  control.dataset.touched='0';
   control.innerHTML=`
     <div class="boost-swap-copy">
       <span>Boost gels</span>
-      <small>100 mg caffeine each · replaces regular gels</small>
+      <small>100 mg caffeine each · any planned gel can be Boost</small>
     </div>
     <div class="boost-swap-stepper">
       <button type="button" class="boost-minus" aria-label="Use fewer Boost gels">−</button>
-      <b class="boost-count">${boost}</b>
+      <b class="boost-count">${suggestedBoost}</b>
       <button type="button" class="boost-plus" aria-label="Use more Boost gels">+</button>
     </div>
     <div class="boost-swap-note"></div>`;
   grid.appendChild(control);
   card.dataset.boostEnhanced='1';
 
+  const refreshBeforeChange=()=>{
+    if(control.dataset.touched!=='1') syncControlFromTally(card,control,{resetSelection:true});
+  };
+
   control.querySelector('.boost-minus')?.addEventListener('click',()=>{
+    refreshBeforeChange();
+    control.dataset.touched='1';
     control.dataset.boost=String(Math.max(0,Number(control.dataset.boost||0)-1));
     renderControl(card,control);
   });
   control.querySelector('.boost-plus')?.addEventListener('click',()=>{
-    control.dataset.boost=String(Math.min(Number(control.dataset.totalGels||0),Number(control.dataset.boost||0)+1));
+    refreshBeforeChange();
+    control.dataset.touched='1';
+    const total=Math.max(0,Number(control.dataset.totalGels||currentPlanGelTotal(card)));
+    control.dataset.boost=String(Math.min(total,Number(control.dataset.boost||0)+1));
     renderControl(card,control);
   });
+
   renderControl(card,control);
+
+  // React can fill the 7/14/30-day tally just after this control mounts.
+  // Re-read it a few times without observing text mutations or causing render loops.
+  [100,400,1000].forEach(ms=>setTimeout(()=>{
+    if(!card.isConnected||control.dataset.touched==='1') return;
+    syncControlFromTally(card,control,{resetSelection:true});
+    renderControl(card,control);
+  },ms));
 }
 
 function enhanceAll(){
@@ -93,14 +134,17 @@ function customAddToBasket(button){
   const control=card?.querySelector('.boost-swap-control');
   if(!card||!control)return false;
 
+  // Get the latest plan total before checkout if the athlete has not changed the split yet.
+  if(control.dataset.touched!=='1') syncControlFromTally(card,control,{resetSelection:true});
+
   const bottleProduct=byKey('bottle_mix');
   const gelProduct=byKey('energy_gel');
   const recoverProduct=byKey('recover');
   const boostVariant=gelProduct?.variants.find(v=>v.title==='Boost');
 
-  const bottleQty=findTallyValue(card,'Bottle Mix').value;
-  const recoverQty=findTallyValue(card,'Recover').value;
-  const totalGels=Number(control.dataset.totalGels||0);
+  const bottleQty=tallyValue(card,'bottle mix');
+  const recoverQty=tallyValue(card,'recover');
+  const totalGels=Math.max(0,Number(control.dataset.totalGels||currentPlanGelTotal(card)));
   const boostQty=Math.max(0,Math.min(totalGels,Number(control.dataset.boost||0)));
   const regularQty=Math.max(0,totalGels-boostQty);
 
