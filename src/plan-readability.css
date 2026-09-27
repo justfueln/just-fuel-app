@@ -1,0 +1,40 @@
+.jf-v3 .planner-flavours label{
+  color:#2a2c26;
+  font-size:14px;
+  font-weight:850;
+}
+
+.jf-v3 .planner-flavours select{
+  color-scheme:light;
+  height:48px;
+  border:1px solid #bfae73;
+  border-radius:12px;
+  background:#fffdf7;
+  color:#1b1d19 !important;
+  -webkit-text-fill-color:#1b1d19;
+  padding:0 12px;
+  font:inherit;
+  font-size:16px;
+  font-weight:700;
+  opacity:1;
+}
+
+.jf-v3 .planner-flavours select option{
+  background:#fffdf7;
+  color:#1b1d19;
+  font-weight:600;
+}
+
+.jf-v3 .planner-flavours select:focus-visible{
+  outline:3px solid rgba(181,139,35,.28);
+  outline-offset:2px;
+  border-color:#a47b19;
+}
+
+.jf-v3 .planner-flavours select:disabled{
+  opacity:1;
+  background:#f5eed7;
+  color:#4e4938 !important;
+  -webkit-text-fill-color:#4e4938;
+  border-color:#c6b87f;
+}
