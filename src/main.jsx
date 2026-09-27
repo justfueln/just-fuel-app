@@ -25,6 +25,7 @@ import './training-feedback.css';
 import './app-polish-v5.css';
 import './checkout-v6.css';
 import './current-shell-v4.css';
+import './navigation-v1.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
