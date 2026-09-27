@@ -4,6 +4,7 @@ import { supabase } from './main';
 import { byKey } from './catalog';
 import { restockShortfalls, hydratePacks, restockBasketUnits } from './fuel-utils';
 import { basketTtlMs, normalizeTrainingTab, readSavedItems } from './app-state-utils';
+import { fetchTrainingCore, fetchTrainingPlan, fetchTrainingRaces, fetchTrainingProfile, fetchTrainingFuelBase, fetchTrainingFuelForecast, sendTrainingOtp, verifyTrainingOtp, syncTrainingStrava, startTrainingStrava } from './training-api';
 
 const TABS=['Overview','My Plan','My Race','Fuel','My Details'];
 const DAY_OPTIONS=[[1,'Mon'],[2,'Tue'],[3,'Wed'],[3,'Wed'],[4,'Thu'],[5,'Fri'],[6,'Sat'],[7,'Sun']].filter((x,i,a)=>a.findIndex(y=>y[0]===x[0])===i);
@@ -50,28 +51,35 @@ export default function AppV3(){
 
   function navigateTab(value){const next=normalizeTrainingTab(value);if(next===tab)return;setTab(next);window.history.pushState({...window.history.state,jfSection:'Training',jfTrainingTab:next,jfBasket:false},'',window.location.href)}
   async function loadCore({keepMessage=false}={}){
-    if(!session?.user)return;if(!keepMessage)setMessage('');const uid=session.user.id;
-    const[a,b]=await Promise.all([supabase.from('training_setup_status').select('*').eq('user_id',uid).maybeSingle(),supabase.from('training_home_summary').select('*').eq('user_id',uid).maybeSingle()]);
-    const err=a.error||b.error;if(err){setMessage(`Could not load Training overview: ${err.message}`);return}
-    setSetup(a.data||null);setHome(b.data||null);
+    if(!session?.user)return;if(!keepMessage)setMessage('');
+    const result=await fetchTrainingCore(supabase,session.user.id);
+    if(result.error){setMessage(`Could not load Training overview: ${result.error.message}`);return}
+    setSetup(result.setup);setHome(result.home);
   }
   async function loadPlan({keepMessage=true}={}){
-    if(!session?.user)return;const uid=session.user.id;
-    const[e,g]=await Promise.all([supabase.from('training_plan_calendar_with_fuel').select('*').eq('user_id',uid).order('session_date',{ascending:true}),supabase.from('training_plans').select('id').eq('user_id',uid).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle()]);
-    const err=e.error||g.error;if(err){if(!keepMessage)setMessage(err.message);else setMessage(`Could not load training plan: ${err.message}`);return}
-    const activePlanId=g.data?.id;setPlan(activePlanId?(e.data||[]).filter(x=>x.plan_id===activePlanId):[]);setLoaded(v=>({...v,plan:true}));
+    if(!session?.user)return;const result=await fetchTrainingPlan(supabase,session.user.id);
+    if(result.error){setMessage(keepMessage?`Could not load training plan: ${result.error.message}`:result.error.message);return}
+    setPlan(result.plan);setLoaded(v=>({...v,plan:true}));
   }
-  async function loadRaces({keepMessage=true}={}){
-    if(!session?.user)return;const r=await supabase.from('athlete_season_events').select('*').eq('user_id',session.user.id).order('event_date',{ascending:true});if(r.error){setMessage(`Could not load events: ${r.error.message}`);return}setRaces(r.data||[]);setLoaded(v=>({...v,races:true}));
+  async function loadRaces(){
+    if(!session?.user)return;const result=await fetchTrainingRaces(supabase,session.user.id);
+    if(result.error){setMessage(`Could not load events: ${result.error.message}`);return}
+    setRaces(result.races);setLoaded(v=>({...v,races:true}));
   }
-  async function loadProfile({keepMessage=true}={}){
-    if(!session?.user)return;const p=await supabase.from('training_profiles').select('*').eq('user_id',session.user.id).maybeSingle();if(p.error){setMessage(`Could not load athlete details: ${p.error.message}`);return}setProfile(p.data||null);setLoaded(v=>({...v,profile:true}));
+  async function loadProfile(){
+    if(!session?.user)return;const result=await fetchTrainingProfile(supabase,session.user.id);
+    if(result.error){setMessage(`Could not load athlete details: ${result.error.message}`);return}
+    setProfile(result.profile);setLoaded(v=>({...v,profile:true}));
   }
   async function loadFuelBase(){
-    if(!session?.user)return;const uid=session.user.id;const[s,p]=await Promise.all([supabase.from('fuel_inventory').select('*').eq('user_id',uid),supabase.from('training_fueling_profiles').select('*').eq('user_id',uid).maybeSingle()]);const err=s.error||p.error;if(err){setMessage(`Could not load fuel settings: ${err.message}`);return}setStock(s.data||[]);setFuelProfile(p.data||null);setLoaded(v=>({...v,fuelBase:true}));
+    if(!session?.user)return;const result=await fetchTrainingFuelBase(supabase,session.user.id);
+    if(result.error){setMessage(`Could not load fuel settings: ${result.error.message}`);return}
+    setStock(result.stock);setFuelProfile(result.fuelProfile);setLoaded(v=>({...v,fuelBase:true}));
   }
   async function loadFuelForecast(){
-    if(!session?.user)return;const ff=await supabase.from('fuel_forecast_usage').select('*').eq('user_id',session.user.id).order('horizon_days');if(ff.error){setMessage(`Training loaded, but fuel forecast could not load: ${ff.error.message}`);return}setFuel(ff.data||[]);setFuelLoaded(true);
+    if(!session?.user)return;const result=await fetchTrainingFuelForecast(supabase,session.user.id);
+    if(result.error){setMessage(`Training loaded, but fuel forecast could not load: ${result.error.message}`);return}
+    setFuel(result.fuel);setFuelLoaded(true);
   }
   async function ensureFuelTab({force=false}={}){
     if(fuelTabLoading)return;setFuelTabLoading(true);
@@ -81,10 +89,10 @@ export default function AppV3(){
   async function reloadAfterRace(){setLoaded(v=>({...v,plan:false}));setFuelLoaded(false);await Promise.all([loadCore({keepMessage:true}),loadRaces()])}
   async function reloadDetails(){await Promise.all([loadCore({keepMessage:true}),loadProfile()])}
   async function reloadFuel(){await Promise.all([loadPlan(),loadFuelBase(),loadFuelForecast()])}
-  async function sendOtp(){const clean=email.trim();if(!clean)return setMessage('Enter your email address first.');setMessage('Sending login code…');const{error}=await supabase.auth.signInWithOtp({email:clean});if(error)return setMessage(error.message);setOtpSent(true);setMessage('Login code sent. Use the full code from the newest email.')}
-  async function verifyOtp(){if(!otp.trim())return setMessage('Enter the login code from your email.');setMessage('Signing in…');const{error}=await supabase.auth.verifyOtp({email:email.trim(),token:otp.trim(),type:'email'});if(error)setMessage(error.message)}
-  async function syncStrava(){if(syncLoading)return;setSyncLoading(true);setMessage('Syncing Strava and adapting your plan…');const{data,error}=await supabase.functions.invoke('strava-sync',{body:{}});if(error)setMessage(error.message);else{const note=data?.plan_adaptation?.changed_sessions?` ${data.plan_adaptation.changed_sessions} upcoming sessions checked/adjusted.`:'';const stamp=new Date().toISOString();localStorage.setItem('jf-strava-last-sync',stamp);setLastSync(stamp);setMessage(`Strava synced.${note}`);await loadCore({keepMessage:true});if(tab==='Fuel')await ensureFuelTab({force:true});else{setFuelLoaded(false);if(tab==='My Plan')await loadPlan();else setLoaded(v=>({...v,plan:false}))}}setSyncLoading(false)}
-  async function connectStrava(){setMessage('Opening Strava…');const{data,error}=await supabase.functions.invoke('strava-start',{body:{}});if(error)return setMessage(error.message);if(data?.authorization_url)window.location.href=data.authorization_url;else setMessage('Could not start the Strava connection.')}
+  async function sendOtp(){const clean=email.trim();if(!clean)return setMessage('Enter your email address first.');setMessage('Sending login code…');const{error}=await sendTrainingOtp(supabase,clean);if(error)return setMessage(error.message);setOtpSent(true);setMessage('Login code sent. Use the full code from the newest email.')}
+  async function verifyOtp(){if(!otp.trim())return setMessage('Enter the login code from your email.');setMessage('Signing in…');const{error}=await verifyTrainingOtp(supabase,email.trim(),otp.trim());if(error)setMessage(error.message)}
+  async function syncStrava(){if(syncLoading)return;setSyncLoading(true);setMessage('Syncing Strava and adapting your plan…');const{data,error}=await syncTrainingStrava(supabase);if(error)setMessage(error.message);else{const note=data?.plan_adaptation?.changed_sessions?` ${data.plan_adaptation.changed_sessions} upcoming sessions checked/adjusted.`:'';const stamp=new Date().toISOString();localStorage.setItem('jf-strava-last-sync',stamp);setLastSync(stamp);setMessage(`Strava synced.${note}`);await loadCore({keepMessage:true});if(tab==='Fuel')await ensureFuelTab({force:true});else{setFuelLoaded(false);if(tab==='My Plan')await loadPlan();else setLoaded(v=>({...v,plan:false}))}}setSyncLoading(false)}
+  async function connectStrava(){setMessage('Opening Strava…');const{data,error}=await startTrainingStrava(supabase);if(error)return setMessage(error.message);if(data?.authorization_url)window.location.href=data.authorization_url;else setMessage('Could not start the Strava connection.')}
   async function signOut(){await supabase.auth.signOut();setSession(null);setTab('Overview');setMessage('');setOtp('');setOtpSent(false);setLoaded({plan:false,races:false,profile:false,fuelBase:false});setFuelLoaded(false);setFuelTabLoading(false)}
 
   if(loading)return<Splash/>;
