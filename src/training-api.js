@@ -35,7 +35,10 @@ export async function fetchTrainingFuelBase(client,userId){
 }
 
 export async function fetchTrainingFuelForecast(client,userId){
-  const result=await client.from('fuel_forecast_usage').select('*').eq('user_id',userId).order('horizon_days');
+  // The old fuel_forecast_usage view expanded forecast events for every athlete
+  // before the API filter was applied and could hit Postgres statement_timeout.
+  // This RPC scopes the calculation to one athlete from the start.
+  const result=await client.rpc('get_training_fuel_forecast',{p_user_id:userId});
   return{fuel:result.data||[],error:result.error||null};
 }
 
