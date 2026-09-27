@@ -6,6 +6,7 @@ import StageRacePlanner from './StageRacePlannerV2';
 const SPORTS=[['all','All sports'],['cycling','Cycling'],['running','Running'],['multisport','Triathlon'],['hyrox','HYROX']];
 const DISCIPLINES=[['all','All disciplines'],['road_cycling','Road cycling'],['mountain_bike','Mountain bike'],['gravel','Gravel'],['time_trial','Time trial'],['stage_racing','Stage / multi-day'],['road_running','Road running'],['trail_running','Trail running'],['ultra_running','Ultra running'],['triathlon','Triathlon'],['hyrox','HYROX']];
 const PROVINCES=['All provinces','Western Cape','Eastern Cape','Northern Cape','KwaZulu-Natal','Gauteng','Free State','North West','Mpumalanga','Limpopo'];
+const RACE_CARB_OPTIONS=[50,60,90,120];
 
 function dateKey(){const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`}
 function fmtDate(v){if(!v)return'—';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${String(v).slice(0,10)}T12:00:00`))}
@@ -49,7 +50,7 @@ export default function RaceHubV2({races=[],userId,reload}){
   }
 
   return <div className="race-v2-shell">
-    {page==='races'?<MyRaces races={races} onOpen={openRace} onAdd={()=>setPage('registry')} onRemove={removeRace} onPriority={changePriority} loading={loading} status={status}/>:page==='registry'?<EventRegistry reload={reload} onDone={()=>setPage('races')} onBack={back}/>:selectedRace?<>
+    {page==='races'?<MyRaces races={races} onOpen={openRace} onAdd={()=>setPage('registry')} onRemove={removeRace} onPriority={changePriority} loading={loading} status={status}/>:page==='registry'?<EventRegistry userId={userId} reload={reload} onDone={()=>setPage('races')} onBack={back}/>:selectedRace?<>
       <RaceTopbar race={selectedRace} page={page} onBack={back}/>
       {page!=='stage'&&<RaceMenu race={selectedRace} value={page} onChange={setPage}/>} 
       {page==='overview'&&<RaceOverview race={selectedRace}/>} 
@@ -78,19 +79,40 @@ function MyRaces({races,onOpen,onAdd,onRemove,onPriority,loading,status}){
   </div>
 }
 
-function EventRegistry({reload,onDone,onBack}){
-  const[catalog,setCatalog]=useState([]),[search,setSearch]=useState(''),[sport,setSport]=useState('all'),[discipline,setDiscipline]=useState('all'),[province,setProvince]=useState('All provinces'),[selected,setSelected]=useState(null),[routes,setRoutes]=useState([]),[routeId,setRouteId]=useState(''),[priority,setPriority]=useState('B'),[goalTime,setGoalTime]=useState(''),[status,setStatus]=useState(''),[loading,setLoading]=useState(false);
+function EventRegistry({userId,reload,onDone,onBack}){
+  const[catalog,setCatalog]=useState([]),[search,setSearch]=useState(''),[sport,setSport]=useState('all'),[discipline,setDiscipline]=useState('all'),[province,setProvince]=useState('All provinces'),[selected,setSelected]=useState(null),[routes,setRoutes]=useState([]),[routeId,setRouteId]=useState(''),[priority,setPriority]=useState('B'),[goalTime,setGoalTime]=useState(''),[carbTarget,setCarbTarget]=useState('auto'),[status,setStatus]=useState(''),[loading,setLoading]=useState(false);
   async function loadCatalog(){const{data,error}=await supabase.from('event_catalog_search').select('*').gte('start_date',dateKey()).order('start_date',{ascending:true}).limit(1200);if(error)setStatus(error.message);else setCatalog(data||[])}
   useEffect(()=>{loadCatalog()},[]);
   const grouped=useMemo(()=>{const map=new Map();for(const row of catalog){if(!map.has(row.event_id))map.set(row.event_id,{...row,routes:[]});if(row.route_id)map.get(row.event_id).routes.push(row)}return[...map.values()]},[catalog]);
   const filtered=useMemo(()=>grouped.filter(e=>{const q=search.trim().toLowerCase();return(!q||`${e.event_name} ${e.city||''} ${e.province||''}`.toLowerCase().includes(q))&&(sport==='all'||e.sport_category===sport)&&(discipline==='all'||e.discipline===discipline)&&(province==='All provinces'||e.province===province)}).slice(0,120),[grouped,search,sport,discipline,province]);
-  async function choose(e){setSelected(e);setPriority('B');setGoalTime('');setRouteId(e.routes?.[0]?.route_id||'');const{data}=await supabase.from('event_catalog_search').select('*').eq('event_id',e.event_id).order('distance_km',{ascending:true});setRoutes(data||[]);setRouteId(data?.[0]?.route_id||'')}
-  async function add(){if(!selected)return;setLoading(true);setStatus('Adding event and rebuilding your plan…');const{error}=await supabase.rpc('add_catalog_event_to_season',{p_event_id:selected.event_id,p_route_id:routeId||null,p_priority:priority,p_goal_time_minutes:goalTime?Number(goalTime):null});if(error)setStatus(error.message);else{const built=await supabase.rpc('generate_season_training_plan');if(built.error)setStatus(`Event added, but the plan could not rebuild: ${built.error.message}`);else{await reload({keepMessage:true});onDone()}}setLoading(false)}
+  async function choose(e){setSelected(e);setPriority('B');setGoalTime('');setCarbTarget('auto');setRouteId(e.routes?.[0]?.route_id||'');const{data}=await supabase.from('event_catalog_search').select('*').eq('event_id',e.event_id).order('distance_km',{ascending:true});setRoutes(data||[]);setRouteId(data?.[0]?.route_id||'')}
+  async function add(){
+    if(!selected)return;
+    setLoading(true);setStatus('Adding event and building your race fuel plan…');
+    const{data:added,error}=await supabase.rpc('add_catalog_event_to_season',{p_event_id:selected.event_id,p_route_id:routeId||null,p_priority:priority,p_goal_time_minutes:goalTime?Number(goalTime):null});
+    if(error){setStatus(error.message);setLoading(false);return}
+    const raceGoalId=added?.race_goal_id;
+    if(raceGoalId&&userId){
+      let fuelError=null;
+      if(carbTarget==='auto'){
+        const result=await supabase.from('race_fueling_overrides').update({carb_target_gph:null,updated_at:new Date().toISOString()}).eq('race_goal_id',raceGoalId).eq('user_id',userId);
+        fuelError=result.error;
+      }else{
+        const result=await supabase.from('race_fueling_overrides').upsert({race_goal_id:raceGoalId,user_id:userId,carb_target_gph:Number(carbTarget),updated_at:new Date().toISOString()},{onConflict:'race_goal_id'});
+        fuelError=result.error;
+      }
+      if(fuelError){setStatus(`Race added, but the fuel target could not be saved: ${fuelError.message}`);setLoading(false);return}
+      if(Number(added?.stage_count||0)>1){const stageBuild=await supabase.rpc('build_personalized_stage_plan',{p_race_goal_id:raceGoalId});if(stageBuild.error){setStatus(`Race added, but the stage fuel plan could not rebuild: ${stageBuild.error.message}`);setLoading(false);return}}
+    }
+    const built=await supabase.rpc('generate_season_training_plan');
+    if(built.error)setStatus(`Event added, but the plan could not rebuild: ${built.error.message}`);else{await reload({keepMessage:true});onDone()}
+    setLoading(false);
+  }
   return <div className="stack race-registry-v2">
     <button className="race-v2-back" onClick={onBack}><ArrowLeft size={18}/>My Races</button>
     <section className="card"><span className="eyebrow">EVENT REGISTRY</span><h2>Find an event</h2><p className="muted">One clean entry per event. Stage races, tours and multi-day experiences are identified automatically.</p><div className="event-search"><Search size={18}/><input placeholder="Search event, city or province" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="race-registry-filters"><select value={sport} onChange={e=>setSport(e.target.value)}>{SPORTS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><select value={discipline} onChange={e=>setDiscipline(e.target.value)}>{DISCIPLINES.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><select value={province} onChange={e=>setProvince(e.target.value)}>{PROVINCES.map(v=><option key={v}>{v}</option>)}</select></div></section>
     {status&&<div className="notice">{status}</div>}
-    {selected&&<section className="card race-registry-selected"><span className="eyebrow">ADD TO MY RACES</span><h3>{selected.event_name}</h3><p className="muted">{registryMeta(selected)}{selected.is_verified?' · Verified source':''}</p>{isStageEvent(selected)&&<p><strong>{stageTypeLabel(selected)}</strong> · {stageSummary(selected)}{selected.end_date?` · ${fmtDate(selected.start_date)} to ${fmtDate(selected.end_date)}`:''}</p>}{routes.length>1&&<label>Route<select value={routeId} onChange={e=>setRouteId(e.target.value)}>{routes.map(r=><option value={r.route_id} key={r.route_id}>{r.route_name||`${r.distance_km||''} km`}</option>)}</select></label>}<div className="race-registry-add-grid"><label>Priority<select value={priority} onChange={e=>setPriority(e.target.value)}><option>A</option><option>B</option><option>C</option></select></label><label>Goal time (minutes)<input inputMode="numeric" value={goalTime} onChange={e=>setGoalTime(e.target.value.replace(/\D/g,''))} placeholder="Optional"/></label></div><button className="primary" disabled={loading} onClick={add}>{loading?'Adding…':isStageEvent(selected)?`Add ${stageTypeLabel(selected).toLowerCase()}`:'Add event'}</button></section>}
+    {selected&&<section className="card race-registry-selected"><span className="eyebrow">ADD TO MY RACES</span><h3>{selected.event_name}</h3><p className="muted">{registryMeta(selected)}{selected.is_verified?' · Verified source':''}</p>{isStageEvent(selected)&&<p><strong>{stageTypeLabel(selected)}</strong> · {stageSummary(selected)}{selected.end_date?` · ${fmtDate(selected.start_date)} to ${fmtDate(selected.end_date)}`:''}</p>}{routes.length>1&&<label>Route<select value={routeId} onChange={e=>setRouteId(e.target.value)}>{routes.map(r=><option value={r.route_id} key={r.route_id}>{r.route_name||`${r.distance_km||''} km`}</option>)}</select></label>}<div className="race-registry-add-grid"><label>Priority<select value={priority} onChange={e=>setPriority(e.target.value)}><option>A</option><option>B</option><option>C</option></select></label><label>Goal time (minutes)<input inputMode="numeric" value={goalTime} onChange={e=>setGoalTime(e.target.value.replace(/\D/g,''))} placeholder="Optional"/></label><label>Race carbs per hour<select value={carbTarget} onChange={e=>setCarbTarget(e.target.value)}><option value="auto">Recommended</option>{RACE_CARB_OPTIONS.map(v=><option key={v} value={v}>{v} g/h</option>)}</select></label></div><p className="muted">This carb target applies to this race only. Just Fuel will calculate the Bottle Mix and gels needed from the race duration.</p><button className="primary" disabled={loading} onClick={add}>{loading?'Adding…':isStageEvent(selected)?`Add ${stageTypeLabel(selected).toLowerCase()}`:'Add event'}</button></section>}
     <div className="race-registry-results">{filtered.map(e=><button className="race-registry-result" key={e.event_id} onClick={()=>choose(e)}><div><strong>{e.event_name}</strong><small>{registryMeta(e)}</small></div><ChevronRight size={18}/></button>)}</div>
   </div>
 }
@@ -126,11 +148,27 @@ function RaceStageDetail({race,stageId}){
 function Info({title,text}){if(!text)return null;return <div className="race-coach-note"><span>{title}</span><p>{text}</p></div>}
 
 function RaceFuelHydration({race}){
-  const[plan,setPlan]=useState(null),[timeline,setTimeline]=useState([]),[loading,setLoading]=useState(true);
-  useEffect(()=>{(async()=>{setLoading(true);const[p,t]=await Promise.all([supabase.from('race_fuel_plan').select('*').eq('race_goal_id',race.race_goal_id).maybeSingle(),supabase.from('race_fuel_timeline').select('*').eq('race_goal_id',race.race_goal_id).order('sort_order')]);setPlan(p.data||null);setTimeline(t.data||[]);setLoading(false)})()},[race.race_goal_id]);
+  const[plan,setPlan]=useState(null),[timeline,setTimeline]=useState([]),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[carbTarget,setCarbTarget]=useState('auto'),[message,setMessage]=useState('');
+  async function load(){setLoading(true);const[p,t]=await Promise.all([supabase.from('race_fuel_plan').select('*').eq('race_goal_id',race.race_goal_id).maybeSingle(),supabase.from('race_fuel_timeline').select('*').eq('race_goal_id',race.race_goal_id).order('sort_order')]);setPlan(p.data||null);setTimeline(t.data||[]);setCarbTarget(p.data?.override_carb_target_gph?String(p.data.override_carb_target_gph):'auto');setLoading(false)}
+  useEffect(()=>{load()},[race.race_goal_id]);
+  async function saveTarget(){
+    setSaving(true);setMessage('');
+    const{data:{session}}=await supabase.auth.getSession();
+    if(!session?.user){setMessage('Please sign in again to update this race.');setSaving(false);return}
+    let error=null;
+    if(carbTarget==='auto'){
+      const result=await supabase.from('race_fueling_overrides').update({carb_target_gph:null,updated_at:new Date().toISOString()}).eq('race_goal_id',race.race_goal_id).eq('user_id',session.user.id);
+      error=result.error;
+    }else{
+      const result=await supabase.from('race_fueling_overrides').upsert({race_goal_id:race.race_goal_id,user_id:session.user.id,carb_target_gph:Number(carbTarget),updated_at:new Date().toISOString()},{onConflict:'race_goal_id'});
+      error=result.error;
+    }
+    if(error){setMessage(error.message);setSaving(false);return}
+    if(isStageEvent(race)){const rebuilt=await supabase.rpc('build_personalized_stage_plan',{p_race_goal_id:race.race_goal_id});if(rebuilt.error){setMessage(`Fuel target saved, but the stage plan could not refresh: ${rebuilt.error.message}`);setSaving(false);return}}
+    await load();setMessage('Race fuel plan updated.');setSaving(false);
+  }
   if(loading)return<section className="card empty"><p>Loading fuel plan…</p></section>;
-  if(!plan)return<section className="card empty"><Fuel size={28}/><p>No race fuel plan yet.</p></section>;
-  return <div className="stack"><section className="card"><span className="eyebrow">FUEL & HYDRATION</span><h2>{plan.carb_target_gph||0} g/h</h2><div className="race-v2-fuel-grid"><span><b>{mins(plan.race_duration_minutes)}</b>Estimated</span><span><b>{plan.carb_target_g_total||0} g</b>Total carbs</span><span><b>{plan.hydration_ml_per_hour||0}</b>ml/h</span><span><b>{plan.sodium_target_mg_per_hour||0}</b>mg sodium/h</span><span><b>{plan.bottle_mix_sachets||0}</b>Bottle Mix</span><span><b>{plan.regular_gels||0}</b>Gels</span><span><b>{plan.boost_gels||0}</b>Boost</span><span><b>{plan.post_race_recover_servings||0}</b>Recover</span></div></section>{timeline.length>0&&<section className="card"><span className="eyebrow">EXECUTION TIMELINE</span><div className="race-fuel-timeline-v2">{timeline.map(t=><div key={`${t.sort_order}-${t.minute_mark}`}><b>{t.minute_mark===0?'Start':`${t.minute_mark} min`}</b><p>{t.instruction}</p></div>)}</div></section>}</div>
+  return <div className="stack"><section className="card"><span className="eyebrow">RACE CARB TARGET</span><h3>Choose your carbs per hour</h3><p className="muted">This target applies to this race only. The planner recalculates Bottle Mix, regular gels and Boost automatically from the race duration.</p><div className="race-registry-add-grid"><label>Carbohydrates per hour<select value={carbTarget} onChange={e=>setCarbTarget(e.target.value)}><option value="auto">Recommended</option>{RACE_CARB_OPTIONS.map(v=><option key={v} value={v}>{v} g/h</option>)}</select></label><button className="primary" disabled={saving} onClick={saveTarget}>{saving?'Updating…':'Update fuel plan'}</button></div>{message&&<div className="notice">{message}</div>}</section>{plan?<><section className="card"><span className="eyebrow">FUEL & HYDRATION</span><h2>{plan.carb_target_gph||0} g/h</h2><div className="race-v2-fuel-grid"><span><b>{mins(plan.race_duration_minutes)}</b>Estimated</span><span><b>{plan.carb_target_g_total||0} g</b>Total carbs</span><span><b>{plan.hydration_ml_per_hour||0}</b>ml/h</span><span><b>{plan.sodium_target_mg_per_hour||0}</b>mg sodium/h</span><span><b>{plan.bottle_mix_sachets||0}</b>Bottle Mix</span><span><b>{plan.regular_gels||0}</b>Gels</span><span><b>{plan.boost_gels||0}</b>Boost</span><span><b>{plan.post_race_recover_servings||0}</b>Recover</span></div>{plan.high_carb_note&&<p className="muted">{plan.high_carb_note}</p>}</section>{timeline.length>0&&<section className="card"><span className="eyebrow">EXECUTION TIMELINE</span><div className="race-fuel-timeline-v2">{timeline.map(t=><div key={`${t.sort_order}-${t.minute_mark}`}><b>{t.minute_mark===0?'Start':`${t.minute_mark} min`}</b><p>{t.instruction}</p></div>)}</div></section>}</>:<section className="card empty"><Fuel size={28}/><p>No race fuel plan yet.</p></section>}</div>
 }
 
 function RaceWaterPoints({race}){
