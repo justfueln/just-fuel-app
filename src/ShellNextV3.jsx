@@ -6,7 +6,7 @@ import MorePage, { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
 import { FuelBuilder, ShopPage, LearnPage } from './CommercePages';
 import HomeIndex from './HomeIndex';
-import { APP_ROUTES, BOTTOM_NAV, trainingTabForRoute } from './navigation-registry';
+import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, trainingTabForRoute, trainingTargetForView, trainingViewFromState } from './navigation-registry';
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
 
 const NAV_ICONS={home:Home,training:Activity,race:Flag,fuel:Fuel,shop:Store};
@@ -25,6 +25,7 @@ function loadLastBasket(){
 export default function ShellNextV3(){
   const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search,pathname:window.location.pathname}));
   const [homeView,setHomeView]=useState(()=>window.history.state?.jfHomeView||'index');
+  const [trainingView,setTrainingView]=useState(()=>trainingViewFromState(window.history.state||{}));
   const [basket,setBasket]=useState(loadBasket);
   const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
@@ -40,15 +41,36 @@ export default function ShellNextV3(){
     const targetTab=trainingTabForRoute(next);
     setBasketOpen(false);
     if(next==='home')setHomeView('index');
+    if(next==='training')setTrainingView('plan');
     applySection(next);
-    window.history.pushState({...window.history.state,jfSection:next,jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,jfHomeView:next==='home'?'index':window.history.state?.jfHomeView,jfBasket:false},'',window.location.href);
+    window.history.pushState({
+      ...window.history.state,
+      jfSection:next,
+      jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,
+      jfTrainingView:next==='training'?'plan':window.history.state?.jfTrainingView,
+      jfTrainingSubView:next==='training'?null:window.history.state?.jfTrainingSubView,
+      jfHomeView:next==='home'?'index':window.history.state?.jfHomeView,
+      jfBasket:false
+    },'',window.location.href);
+  }
+  function openTrainingView(value){
+    const target=trainingTargetForView(value);
+    setTrainingView(target.id);
+    window.history.pushState({
+      ...window.history.state,
+      jfSection:'training',
+      jfTrainingTab:target.legacyTab,
+      jfTrainingView:target.id,
+      jfTrainingSubView:target.subView,
+      jfBasket:false
+    },'',window.location.href);
   }
   function openHomeView(value){
     const next=value||'index';
     setHomeView(next);
     window.history.pushState({...window.history.state,jfSection:'home',jfHomeView:next,jfBasket:false},'',window.location.href);
   }
-  function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfHomeView:homeView,jfBasket:true},'',window.location.href)}
+  function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfHomeView:homeView,jfTrainingView:trainingView,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
   function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
@@ -64,11 +86,23 @@ export default function ShellNextV3(){
     }
     const nextUrl=stravaReturn?`${url.pathname}${url.search}${url.hash}`:window.location.href;
     const targetTab=trainingTabForRoute(section);
-    window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,jfHomeView:section==='home'?(window.history.state?.jfHomeView||homeView):window.history.state?.jfHomeView,jfBasket:false},'',nextUrl);
+    const initialTrainingView=section==='training'?trainingViewFromState(window.history.state||{}):trainingView;
+    const target=trainingTargetForView(initialTrainingView);
+    if(section==='training')setTrainingView(initialTrainingView);
+    window.history.replaceState({
+      ...window.history.state,
+      jfSection:section,
+      jfTrainingTab:section==='training'?target.legacyTab:(targetTab||window.history.state?.jfTrainingTab),
+      jfTrainingView:section==='training'?initialTrainingView:window.history.state?.jfTrainingView,
+      jfTrainingSubView:section==='training'?target.subView:window.history.state?.jfTrainingSubView,
+      jfHomeView:section==='home'?(window.history.state?.jfHomeView||homeView):window.history.state?.jfHomeView,
+      jfBasket:false
+    },'',nextUrl);
     const onPop=e=>{
       const next=normalizeMainSection(e.state?.jfSection||'home');
       setSectionState(next);
       setHomeView(e.state?.jfHomeView||'index');
+      setTrainingView(trainingViewFromState(e.state||{}));
       setBasketOpen(Boolean(e.state?.jfBasket));
     };
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
@@ -90,7 +124,7 @@ export default function ShellNextV3(){
     window.addEventListener('jf-basket-updated',syncBasket);
     window.addEventListener('jf-open-basket',open);
     return ()=>{window.removeEventListener('jf-basket-updated',syncBasket);window.removeEventListener('jf-open-basket',open)};
-  },[section,basketOpen,homeView]);
+  },[section,basketOpen,homeView,trainingView]);
 
   useEffect(()=>{
     const standalone=window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;
@@ -121,7 +155,7 @@ export default function ShellNextV3(){
     if(!installPrompt) return; await installPrompt.prompt(); try{await installPrompt.userChoice}catch{} setInstallPrompt(null);
   }
 
-  return <div className={`full-shell jf-next jf-v3 current-shell ${isTrainingArea?'training-page':'current-page'}`}>
+  return <div className={`full-shell jf-next jf-v3 current-shell ${isTrainingArea?'training-page phase2-training-shell':'current-page'}`}>
     {!isTrainingArea&&<CurrentAppHeader count={basketCount} onBasket={openBasket}/>} 
     {isTrainingArea&&<button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button>}
     {reminderDue&&!isTrainingArea&&<ReminderBanner reminder={reminder} onPlan={()=>{if(section!=='home')applySection('home');openHomeView('plan');dismissReminder()}} onDismiss={dismissReminder}/>} 
@@ -133,12 +167,17 @@ export default function ShellNextV3(){
       {section==='home'&&homeView==='learn'&&<LearnPage/>}
       {section==='home'&&homeView==='settings'&&<MorePage reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>} 
       {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
-      {isTrainingArea&&<TrainingApp key={section}/>} 
+      {section==='training'&&<TrainingPhaseNav value={trainingView} onChange={openTrainingView}/>} 
+      {isTrainingArea&&<TrainingApp key={`${section}-${section==='training'?trainingView:'root'}`}/>} 
     </div>
 
     <nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>
     <CheckoutDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
   </div>
+}
+
+function TrainingPhaseNav({value,onChange}){
+  return <nav className="training-phase2-nav" aria-label="Training pages">{TRAINING_NAV.map(item=><button key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}</nav>;
 }
 
 function CurrentAppHeader({count,onBasket}){
