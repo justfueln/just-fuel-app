@@ -40,7 +40,7 @@ export async function fetchTrainingFuelForecast(client,userId){
 }
 
 export async function fetchTrainingHistory(client,userId){
-  const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,average_heartrate,max_heartrate,average_cadence,average_watts,weighted_average_watts,kilojoules,calories,trainer,manual,is_duplicate,exclude_from_analysis,synced_at';
+  const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,average_heartrate,max_heartrate,average_cadence,average_watts,weighted_average_watts,kilojoules,calories,trainer,manual,is_duplicate,exclude_from_analysis,synced_at,raw';
   const rows=[];
   const pageSize=500;
   for(let from=0;;from+=pageSize){
