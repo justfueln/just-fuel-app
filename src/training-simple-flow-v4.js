@@ -1,3 +1,5 @@
+import './training-adaptive-loader';
+
 let queued=false;
 
 function buttonByText(root,text){
