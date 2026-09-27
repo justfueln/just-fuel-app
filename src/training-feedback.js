@@ -34,7 +34,11 @@ async function saveFeedback(row,feel,flags=[]){
   const{error}=await sb.from('training_session_feedback').upsert(payload,{onConflict:'user_id,session_id'});
   if(error)throw error;
   feedbackMap.set(row.id,{session_id:row.id,feel,flags});
+  let decision=null;
+  try{const result=await sb.rpc('refresh_next_training_coach_decision',{p_user_id:session.user.id});decision=result.data||null}catch{}
   window.jfTrack?.('workout_feedback_saved',{},'training');
+  window.dispatchEvent(new CustomEvent('jf-training-feedback-saved',{detail:{sessionId:row.id,decision}}));
+  window.dispatchEvent(new CustomEvent('jf-training-plan-updated',{detail:{source:'feedback',decision}}));
 }
 
 function addFeedback(card,row,existing){
@@ -58,7 +62,7 @@ function addFeedback(card,row,existing){
   }
   async function persist(){
     if(!selectedFeel)return;status.textContent='Saving…';
-    try{await saveFeedback(row,selectedFeel,flags);status.textContent='Saved';setTimeout(()=>status.textContent='Feedback saved',1200)}
+    try{await saveFeedback(row,selectedFeel,flags);status.textContent='Saved · coach refreshed';setTimeout(()=>status.textContent='Feedback saved',1400)}
     catch(e){status.textContent=e?.message||'Could not save'}
   }
 
