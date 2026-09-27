@@ -33,6 +33,7 @@ import './fuel-hub-v2.css';
 import './profile-hub-v1.css';
 import './mobile-ux-audit-v1.css';
 import './mobile-scroll-performance-v1.css';
+import './home-dashboard-v1.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
