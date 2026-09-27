@@ -9,12 +9,15 @@ import {
   CATALOG, FREE_PUDO_THRESHOLD, SHOP_DOMAIN, WHATSAPP_NUMBER,
   byKey, money, numericVariantId
 } from './catalog';
+import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems } from './app-state-utils';
 
 const NAV = [
   ['Plan', Calculator], ['Learn', BookOpen], ['Shop', Store], ['Training', Activity], ['More', MoreHorizontal]
 ];
 const BASKET_KEY = 'just-fuel-basket-v3';
-const BASKET_TTL = 24 * 60 * 60 * 1000;
+const LAST_BASKET_KEY = 'just-fuel-last-basket-v1';
+const BASKET_TTL = basketTtlMs;
+const LAST_BASKET_TTL = lastBasketTtlMs;
 const REMINDER_KEY = 'just-fuel-weekly-reminder';
 const LAST_SECTION_KEY = 'just-fuel-last-section';
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -34,12 +37,10 @@ function localDateKey(){
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 function loadBasket(){
-  try{
-    const raw=localStorage.getItem(BASKET_KEY); if(!raw) return [];
-    const parsed=JSON.parse(raw);
-    if(!parsed?.savedAt || Date.now()-parsed.savedAt>BASKET_TTL){ localStorage.removeItem(BASKET_KEY); return []; }
-    return Array.isArray(parsed.items)?parsed.items:[];
-  }catch{return []}
+  try{const raw=localStorage.getItem(BASKET_KEY);const items=readSavedItems(raw,BASKET_TTL);if(raw&&!items.length)localStorage.removeItem(BASKET_KEY);return items}catch{return[]}
+}
+function loadLastBasket(){
+  try{const raw=localStorage.getItem(LAST_BASKET_KEY);const items=readSavedItems(raw,LAST_BASKET_TTL);if(raw&&!items.length)localStorage.removeItem(LAST_BASKET_KEY);return items}catch{return[]}
 }
 function loadReminder(){
   try{return {...REMINDER_DEFAULT,...(JSON.parse(localStorage.getItem(REMINDER_KEY))||{})}}
@@ -79,24 +80,37 @@ function suggestedCarbsPerHour(durationHours,sessionType){
 }
 
 export default function ShellNextV3(){
-  const [section,setSectionState]=useState(()=>localStorage.getItem(LAST_SECTION_KEY)||'Plan');
+  const [section,setSectionState]=useState(()=>normalizeMainSection(window.history.state?.jfSection||localStorage.getItem(LAST_SECTION_KEY)||'Plan'));
   const [basket,setBasket]=useState(loadBasket);
+  const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
   const [reminder,setReminder]=useState(loadReminder);
   const [reminderDue,setReminderDue]=useState(false);
   const [installPrompt,setInstallPrompt]=useState(null);
   const [installed,setInstalled]=useState(false);
 
-  const setSection=value=>{setSectionState(value);localStorage.setItem(LAST_SECTION_KEY,value)};
+  function applySection(value){const next=normalizeMainSection(value);setSectionState(next);localStorage.setItem(LAST_SECTION_KEY,next);return next}
+  function setSection(value){const next=normalizeMainSection(value);if(next===section)return;setBasketOpen(false);applySection(next);window.history.pushState({...window.history.state,jfSection:next,jfBasket:false},'',window.location.href)}
+  function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfBasket:true},'',window.location.href)}
+  function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
+  function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
+  function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
+
+  useEffect(()=>{
+    if(!window.history.state?.jfSection)window.history.replaceState({...window.history.state,jfSection:section,jfBasket:false},'',window.location.href);
+    const onPop=e=>{const next=normalizeMainSection(e.state?.jfSection||localStorage.getItem(LAST_SECTION_KEY)||'Plan');setSectionState(next);localStorage.setItem(LAST_SECTION_KEY,next);setBasketOpen(Boolean(e.state?.jfBasket))};
+    window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
+  },[]);
 
   useEffect(()=>{
     if(basket.length) localStorage.setItem(BASKET_KEY,JSON.stringify({savedAt:Date.now(),items:basket}));
     else localStorage.removeItem(BASKET_KEY);
   },[basket]);
+  useEffect(()=>{if(lastBasket.length)localStorage.setItem(LAST_BASKET_KEY,JSON.stringify({savedAt:Date.now(),items:lastBasket}))},[lastBasket]);
 
   useEffect(()=>{
     const syncBasket=()=>setBasket(loadBasket());
-    const open=()=>{syncBasket();setBasketOpen(true)};
+    const open=()=>{syncBasket();openBasket()};
     if(sessionStorage.getItem('jf-open-basket-after-reload')==='1'){
       sessionStorage.removeItem('jf-open-basket-after-reload');
       open();
@@ -104,7 +118,7 @@ export default function ShellNextV3(){
     window.addEventListener('jf-basket-updated',syncBasket);
     window.addEventListener('jf-open-basket',open);
     return ()=>{window.removeEventListener('jf-basket-updated',syncBasket);window.removeEventListener('jf-open-basket',open)};
-  },[]);
+  },[section,basketOpen]);
 
   useEffect(()=>{
     localStorage.setItem(REMINDER_KEY,JSON.stringify(reminder));
@@ -154,20 +168,20 @@ export default function ShellNextV3(){
   function dismissReminder(){setReminder(r=>({...r,lastShown:localDateKey()}));setReminderDue(false)}
 
   return <div className={`full-shell jf-next jf-v3 ${section==='Training'?'training-page':'light-page'}`}>
-    {section!=='Training'&&<AppHeader count={basketCount} onBasket={()=>setBasketOpen(true)}/>} 
-    {section==='Training'&&<button className="training-basket" onClick={()=>setBasketOpen(true)} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button>}
+    {section!=='Training'&&<AppHeader count={basketCount} onBasket={openBasket}/>} 
+    {section==='Training'&&<button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button>}
     {reminderDue&&section!=='Training'&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('Plan');dismissReminder()}} onDismiss={dismissReminder}/>} 
 
     <div className="shell-content">
-      {section==='Plan'&&<FuelBuilder addLine={addLine} openBasket={()=>setBasketOpen(true)}/>} 
+      {section==='Plan'&&<FuelBuilder addLine={addLine} openBasket={openBasket}/>} 
       {section==='Learn'&&<LearnPage/>}
-      {section==='Shop'&&<ShopPage addLine={addLine} openBasket={()=>setBasketOpen(true)}/>} 
+      {section==='Shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
       {section==='Training'&&<TrainingApp/>}
       {section==='More'&&<MorePage reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>} 
     </div>
 
     <nav className="bottom-nav" aria-label="Main navigation">{NAV.map(([label,Icon])=><button key={label} className={section===label?'active':''} onClick={()=>setSection(label)}><Icon size={25}/><span>{label}</span></button>)}</nav>
-    <BasketDrawer open={basketOpen} close={()=>setBasketOpen(false)} basket={basket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
+    <BasketDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
   </div>
 }
 
@@ -268,12 +282,13 @@ function ShopPage({addLine,openBasket}){
   </main>
 }
 
-function BasketDrawer({open,close,basket,count,total,setQty,clear}){
+function BasketDrawer({open,close,basket,lastBasket,repeatLastBasket,remember,count,total,setQty,clear}){
   const remaining=Math.max(0,FREE_PUDO_THRESHOLD-total),progress=Math.min(100,(total/FREE_PUDO_THRESHOLD)*100);
-  function checkoutOnline(){if(!basket.length)return;const lines=basket.map(x=>`${numericVariantId(x.variantId)}:${x.quantity}`).join(',');window.location.assign(`${SHOP_DOMAIN}/cart/${lines}?ref=just-fuel-app`)}
-  function checkoutWhatsApp(){if(!basket.length)return;const lines=basket.map(x=>`• ${x.productTitle} — ${x.variantTitle} × ${x.quantity} — ${money(x.price*x.quantity)}`);const text=['Hi Just Fuel, I would like to place an order:','',...lines,'',`Order total: ${money(total)}`,total>=FREE_PUDO_THRESHOLD?'PUDO: Free over R600':'PUDO: R75 below R600','','Please confirm availability and collection / delivery details.'].join('\n');window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`,'_blank','noopener,noreferrer')}
+  const previousCount=lastBasket.reduce((n,x)=>n+Number(x.quantity||0),0);
+  function checkoutOnline(){if(!basket.length)return;remember(basket);const lines=basket.map(x=>`${numericVariantId(x.variantId)}:${x.quantity}`).join(',');window.location.assign(`${SHOP_DOMAIN}/cart/${lines}?ref=just-fuel-app`)}
+  function checkoutWhatsApp(){if(!basket.length)return;remember(basket);const lines=basket.map(x=>`• ${x.productTitle} — ${x.variantTitle} × ${x.quantity} — ${money(x.price*x.quantity)}`);const text=['Hi Just Fuel, I would like to place an order:','',...lines,'',`Order total: ${money(total)}`,total>=FREE_PUDO_THRESHOLD?'PUDO: Free over R600':'PUDO: R75 below R600','','Please confirm availability and collection / delivery details.'].join('\n');window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`,'_blank','noopener,noreferrer')}
   if(!open)return null;
-  return <div className="basket-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><aside className="basket-drawer"><div className="basket-head"><div><span className="eyebrow-light">YOUR BASKET</span><h2>{count} {count===1?'item':'items'}</h2></div><button onClick={close} className="basket-close"><X size={24}/></button></div>{basket.length===0?<div className="basket-empty"><ShoppingBag size={36}/><h3>Your basket is empty</h3><p>Add fuel from Shop, Plan or Training.</p></div>:<><div className="basket-lines">{basket.map(line=><div className="basket-line" key={line.variantId}><img src={line.image} alt=""/><div className="basket-line-main"><strong>{line.productTitle}</strong><span>{line.variantTitle}</span><b>{money(line.price*line.quantity)}</b></div><div className="basket-line-actions"><button onClick={()=>setQty(line.variantId,line.quantity-1)}><Minus size={15}/></button><span>{line.quantity}</span><button onClick={()=>setQty(line.variantId,line.quantity+1)}><Plus size={15}/></button><button className="remove" onClick={()=>setQty(line.variantId,0)}><Trash2 size={16}/></button></div></div>)}</div><div className="delivery-progress"><div className="progress-copy">{remaining>0?<><b>{money(remaining)}</b> away from free PUDO delivery</>:<b>Free PUDO delivery unlocked</b>}</div><div className="progress-track"><span style={{width:`${progress}%`}}/></div></div><div className="basket-total"><span>Total</span><strong>{money(total)}</strong></div><button className="checkout-online" onClick={checkoutOnline}><CreditCard size={19}/>Online checkout</button><button className="checkout-whatsapp" onClick={checkoutWhatsApp}><MessageCircle size={19}/>WhatsApp checkout</button><button className="clear-basket" onClick={clear}>Clear basket</button></>}<p className="basket-expiry">Basket resets after 24 hours of inactivity.</p></aside></div>
+  return <div className="basket-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><aside className="basket-drawer"><div className="basket-head"><div><span className="eyebrow-light">YOUR BASKET</span><h2>{count} {count===1?'item':'items'}</h2></div><button onClick={close} className="basket-close"><X size={24}/></button></div>{basket.length===0?<div className="basket-empty"><ShoppingBag size={36}/><h3>Your basket is empty</h3><p>Add fuel from Shop, Plan or Training.</p>{lastBasket.length>0&&<button className="repeat-basket" onClick={repeatLastBasket}><ShoppingBag size={17}/>Repeat previous basket · {previousCount} item{previousCount===1?'':'s'}</button>}</div>:<><div className="basket-lines">{basket.map(line=><div className="basket-line" key={line.variantId}><img src={line.image} alt=""/><div className="basket-line-main"><strong>{line.productTitle}</strong><span>{line.variantTitle}</span><b>{money(line.price*line.quantity)}</b></div><div className="basket-line-actions"><button onClick={()=>setQty(line.variantId,line.quantity-1)}><Minus size={15}/></button><span>{line.quantity}</span><button onClick={()=>setQty(line.variantId,line.quantity+1)}><Plus size={15}/></button><button className="remove" onClick={()=>setQty(line.variantId,0)}><Trash2 size={16}/></button></div></div>)}</div><div className="delivery-progress"><div className="progress-copy">{remaining>0?<><b>{money(remaining)}</b> away from free PUDO delivery</>:<b>Free PUDO delivery unlocked</b>}</div><div className="progress-track"><span style={{width:`${progress}%`}}/></div></div><div className="basket-total"><span>Total</span><strong>{money(total)}</strong></div><button className="checkout-online" onClick={checkoutOnline}><CreditCard size={19}/>Online checkout</button><button className="checkout-whatsapp" onClick={checkoutWhatsApp}><MessageCircle size={19}/>WhatsApp checkout</button><button className="clear-basket" onClick={clear}>Clear basket</button></>}<p className="basket-expiry">Basket stays saved for 14 days of inactivity.</p></aside></div>
 }
 
 function LearnPage(){
