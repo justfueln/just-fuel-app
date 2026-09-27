@@ -143,7 +143,7 @@ export default function ShellNextV3(){
   const basketCount=useMemo(()=>basket.reduce((n,x)=>n+x.quantity,0),[basket]);
   const basketTotal=useMemo(()=>basket.reduce((n,x)=>n+x.price*x.quantity,0),[basket]);
 
-  function addLine(product,variant,quantity=1,{openBasket=false}={}){
+  function addLine(product,variant,quantity=1,{openBasket:shouldOpen=false}={}){
     const qty=Math.max(0,Number(quantity)||0); if(!qty || !product || !variant) return;
     setBasket(prev=>{
       const idx=prev.findIndex(x=>x.variantId===variant.id);
@@ -151,7 +151,7 @@ export default function ShellNextV3(){
       if(idx<0) return [...prev,line];
       return prev.map((x,i)=>i===idx?{...x,quantity:x.quantity+qty}:x);
     });
-    if(openBasket) setBasketOpen(true);
+    if(shouldOpen) openBasket();
   }
   function setLineQty(variantId,quantity){
     const qty=Math.max(0,Number(quantity)||0);
