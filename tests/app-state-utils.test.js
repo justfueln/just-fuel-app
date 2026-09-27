@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {basketTtlMs,lastBasketTtlMs,normalizeMainSection,normalizeTrainingTab,readSavedItems} from '../src/app-state-utils.js';
+import {basketTtlMs,lastBasketTtlMs,normalizeMainSection,normalizeTrainingTab,readSavedItems,resolveInitialMainSection} from '../src/app-state-utils.js';
 
 test('normalizes main navigation safely',()=>{
   assert.equal(normalizeMainSection('Training'),'Training');
@@ -10,6 +10,16 @@ test('normalizes main navigation safely',()=>{
 test('normalizes Training tabs safely',()=>{
   assert.equal(normalizeTrainingTab('Fuel'),'Fuel');
   assert.equal(normalizeTrainingTab('Unknown'),'Overview');
+});
+
+test('Strava callback opens Training instead of Plan',()=>{
+  assert.equal(resolveInitialMainSection({historyState:null,search:'?strava=connected'}),'Training');
+  assert.equal(resolveInitialMainSection({historyState:{jfSection:'Plan'},search:'?strava=error&detail=cancelled'}),'Training');
+});
+
+test('normal reload keeps the current main section when available',()=>{
+  assert.equal(resolveInitialMainSection({historyState:{jfSection:'Shop'},search:''}),'Shop');
+  assert.equal(resolveInitialMainSection({historyState:null,search:''}),'Plan');
 });
 
 test('keeps active basket for 14 days and expires stale basket',()=>{
