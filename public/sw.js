@@ -1,5 +1,5 @@
-const CACHE='just-fuel-v3';
-const CORE=['/','/index.html','/manifest.webmanifest','/icon.svg'];
+const CACHE='just-fuel-v4';
+const CORE=['/','/index.html','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
 
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)));
@@ -36,7 +36,23 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  const cacheable=['script','style','image','font','manifest'].includes(request.destination) || url.pathname.endsWith('.svg');
+  const networkFirst=['script','style','manifest'].includes(request.destination);
+  if(networkFirst){
+    event.respondWith(
+      fetch(request)
+        .then(response=>{
+          if(response.ok){
+            const copy=response.clone();
+            caches.open(CACHE).then(cache=>cache.put(request,copy));
+          }
+          return response;
+        })
+        .catch(()=>caches.match(request))
+    );
+    return;
+  }
+
+  const cacheable=['image','font'].includes(request.destination) || url.pathname.endsWith('.svg') || url.pathname.endsWith('.png');
   if(!cacheable) return;
 
   event.respondWith(
