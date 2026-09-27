@@ -1,6 +1,6 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import RaceCalendarBase from './RaceCalendarBase';
-import StageRacePlanner from './StageRacePlanner';
+import StageRacePlanner from './StageRacePlannerV2';
 
 function isStageRace(race){const text=`${race?.event_type||''} ${race?.discipline||''} ${race?.subdiscipline||''}`.toLowerCase();return Boolean(race?.multi_day)||Number(race?.stage_count||0)>1||text.includes('stage')}
 
