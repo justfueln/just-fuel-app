@@ -1,1 +1,1 @@
-export {default} from './RaceCalendarStageWrapper';
+export {default} from './RaceHubStandalone';
