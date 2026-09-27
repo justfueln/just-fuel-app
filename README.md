@@ -30,3 +30,6 @@ npm run build
 ```
 
 The browser uses the Supabase publishable key only. Never add service-role keys, Strava client secrets, or Resend API keys to this repository.
+
+## Migration preview
+The `current-pwa-migration` branch is used for safe preview deployments before any production change.
