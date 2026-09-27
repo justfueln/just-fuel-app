@@ -36,38 +36,11 @@ export const supabase = createClient(
   { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
 );
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    const hadController = Boolean(navigator.serviceWorker.controller);
-    let refreshing = false;
-
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!hadController || refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
-
-    try {
-      const registration = await navigator.serviceWorker.register('/sw.js?v=10', {
-        scope: '/',
-        updateViaCache: 'none'
-      });
-      await registration.update();
-
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.filter(key => key.startsWith('just-fuel-')).map(key => caches.delete(key)));
-      }
-
-      const refreshServiceWorker = () => {
-        if (document.visibilityState === 'visible') registration.update().catch(() => {});
-      };
-      document.addEventListener('visibilitychange', refreshServiceWorker);
-    } catch (error) {
-      console.warn('Service worker registration failed:', error);
-    }
-  });
-}
+// Deliberately no service-worker registration here.
+// Older Just Fuel builds cached entire application shells, which allowed a
+// retired UI to reappear. The boot loader in index.html now purges those
+// registrations/caches before React starts. The current app is network-first
+// from the active deployment only.
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
