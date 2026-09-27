@@ -1,0 +1,153 @@
+:root{--jf-content:760px;--jf-pad:16px;--jf-nav:74px;--jf-gold:#e0b84f;--jf-bg:#080808;--jf-card:#11110f;--jf-line:#2d2b24;--jf-muted:#91938d}
+html,body,#root{width:100%;max-width:100%;overflow-x:hidden;background:var(--jf-bg)}
+body{overscroll-behavior-y:none}
+button,a,input,select,textarea{touch-action:manipulation}
+button{-webkit-tap-highlight-color:transparent}
+img,svg{max-width:100%}
+.full-shell,.shell-content,.app-shell,main,.stack,.card,.hero-card{min-width:0}
+.shell-content{width:100%;max-width:100%;overflow-x:clip}
+.notice{font-size:.84rem;line-height:1.45;overflow-wrap:anywhere;word-break:break-word}
+.primary,.secondary,.icon-btn,.race-v2-add,.race-v2-back,.fuel-v2-menu-card,.profile-menu-item{min-height:44px}
+input,select,textarea{min-height:44px}
+.card,.hero-card{border-radius:16px}
+
+/* Global header: compact, consistent and easier to scan on phones. */
+.current-app-header{min-height:76px;padding:11px max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right));gap:12px}
+.current-brand{font-size:23px;line-height:1;letter-spacing:2.5px}
+.current-subbrand{margin-top:5px;font-size:9px;letter-spacing:1.65px}
+.current-header-actions{gap:7px}
+.current-profile-button,.phase5-profile-shell .current-app-header .current-bag-button{width:44px;height:44px;border-radius:14px}
+.current-bag-button span{right:-4px;top:-5px;min-width:22px;height:22px;font-size:11px}
+
+/* Bottom navigation: shorter but still a 44px+ touch target. */
+.bottom-nav.phase1-nav{height:calc(var(--jf-nav) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);background:rgba(10,10,9,.98);backdrop-filter:blur(14px);border-top:1px solid #2b2922}
+.bottom-nav.phase1-nav button{min-height:var(--jf-nav);gap:4px;padding:7px 2px 6px!important}
+.bottom-nav.phase1-nav button svg{width:23px;height:23px}
+.bottom-nav.phase1-nav button span{font-size:.68rem!important;line-height:1}
+.jf-next{padding-bottom:calc(var(--jf-nav) + env(safe-area-inset-bottom))}
+.phase5-profile-shell.profile-open{padding-bottom:0}
+.phase5-profile-shell.profile-open .bottom-nav{display:none!important}
+
+/* Home: one clear index, no oversized marketing hero. */
+.home-index{max-width:var(--jf-content);padding:20px var(--jf-pad) calc(var(--jf-nav) + 28px)}
+.home-index-hero{padding:4px 2px 16px}
+.home-index-hero h1{font-size:1.75rem;line-height:1.08;margin:6px 0 7px;letter-spacing:-.02em}
+.home-index-hero p{font-size:.9rem;line-height:1.45;max-width:520px}
+.home-index-primary{gap:9px}
+.home-index-card{min-height:96px;padding:14px;border-radius:16px;gap:11px;align-items:center}
+.home-index-icon{width:40px;height:40px;border-radius:12px}
+.home-index-copy{gap:3px}
+.home-index-copy strong{font-size:.96rem}
+.home-index-copy small{font-size:.74rem;line-height:1.35}
+
+/* Public/commerce pages: remove legacy giant headings and excessive whitespace. */
+.current-page .public-page{max-width:var(--jf-content);padding:22px var(--jf-pad) calc(var(--jf-nav) + 32px)}
+.current-page .public-page h1{font-size:clamp(1.85rem,8vw,2.25rem)!important;line-height:1.08!important;letter-spacing:-.03em!important;margin:0 0 9px!important}
+.current-page .page-kicker{font-size:.68rem;letter-spacing:.12em;margin-bottom:10px}
+.current-page .page-lead{font-size:.95rem;line-height:1.5;margin-bottom:20px}
+.current-page .builder-card,.current-page .plan-result,.current-page .settings-card,.current-page .shop-order-card,.current-page .learn-cards details{border-radius:16px!important}
+.shop-product-tabs{margin-bottom:14px;gap:6px}
+.shop-product-tabs button{padding:9px 12px;font-size:.78rem}
+.shop-product-hero{padding:14px;gap:13px}
+.shop-product-hero h2{font-size:1.35rem;margin:4px 0}
+.shop-selection-summary{margin:14px}
+.shop-add-selected{margin:0 14px 14px;width:calc(100% - 28px)}
+.variant-order-list{padding:0 14px}
+.variant-order-row.has-qty{margin:0 -14px;padding-left:14px;padding-right:14px}
+
+/* Training: fixed four-section navigation without swallowing the viewport. */
+.phase2-training-shell .app-shell>.topbar{min-height:68px;padding:11px 126px 9px 14px}
+.phase2-training-shell .app-shell>.topbar .brand{font-size:.9rem}
+.phase2-training-shell .app-shell>.topbar .subbrand{font-size:.58rem}
+.training-profile-button,.phase5-profile-shell .training-basket{top:12px;width:44px;height:44px;border-radius:14px}
+.training-profile-button{right:68px}
+.training-phase2-nav{top:68px;padding:7px 10px 7px;gap:5px}
+.training-phase2-nav button{min-height:42px;padding:7px 3px;font-size:.69rem;border-radius:11px}
+.training-phase2-nav+.app-shell main{padding-top:64px}
+.phase2-training-shell .app-shell main{padding-left:12px;padding-right:12px;padding-bottom:calc(var(--jf-nav) + 24px)}
+.phase2-training-shell .card,.phase2-training-shell .hero-card{padding:15px}
+.phase2-training-shell h2{font-size:1.35rem}
+.phase2-training-shell h3{font-size:1rem}
+.phase2-training-shell .fuel-summary{line-height:1.4;align-items:flex-start}
+
+/* Race: keep hierarchy compact and make the section switcher useful while scrolling. */
+.race-v2-shell{width:100%;max-width:var(--jf-content);margin:0 auto;gap:11px;padding-bottom:16px}
+.race-v2-heading{gap:10px;padding-top:2px}
+.race-v2-heading h2{font-size:1.5rem;margin:.15rem 0 .25rem}
+.race-v2-heading p{font-size:.8rem;line-height:1.4}
+.race-v2-card{border-radius:16px}
+.race-v2-card-main{padding:13px;gap:10px}
+.race-v2-card-actions{padding:9px 12px}
+.race-v2-menu{position:sticky;top:68px;z-index:16;padding:9px 11px;border-radius:13px;background:rgba(17,17,15,.97);backdrop-filter:blur(12px)}
+.race-v2-menu select{min-height:42px;padding:9px 10px!important}
+.race-v2-topbar{padding-top:0;margin-bottom:1px}
+.race-v2-hero h2{font-size:1.35rem}
+.race-v2-countdown strong{font-size:2rem}
+.race-v2-metrics>div{padding:10px}
+.race-stage-row-v2{padding:11px;border-radius:14px}
+.race-stage-number-v2{border-radius:12px}
+.race-registry-result{padding:11px 12px}
+
+/* Fuel: keep summary first and compress repeated spacing. */
+.fuel-v2-shell,.fuel-v2-page{max-width:var(--jf-content);padding:20px var(--jf-pad) calc(var(--jf-nav) + 28px)}
+.fuel-v2-head{margin-bottom:11px;align-items:center}
+.fuel-v2-head h2{font-size:1.5rem;margin:.18rem 0 .3rem}
+.fuel-v2-head p{font-size:.88rem;line-height:1.45}
+.fuel-v2-summary{padding:15px!important}
+.fuel-v2-summary h3{font-size:1.15rem;margin:.2rem 0 .65rem}
+.fuel-v2-summary-grid{gap:7px}
+.fuel-v2-summary-grid span,.fuel-v2-session-grid span{padding:9px 6px}
+.fuel-v2-stock-callout{margin-top:10px}
+.fuel-v2-menu{gap:8px;margin-top:10px}
+.fuel-v2-menu-card{padding:11px 12px;border-radius:14px}
+.fuel-v2-menu-card>span{width:38px;height:38px}
+.fuel-v2-menu-card strong{font-size:.9rem}
+.fuel-v2-menu-card small{font-size:.72rem}
+.fuel-v2-topbar{margin-bottom:11px}
+
+/* Profile: it is a real page, not a disabled overlay over the main nav. */
+.profile-hub,.profile-page{max-width:var(--jf-content);padding:14px var(--jf-pad) 28px;gap:11px}
+.profile-hub-top>button{width:44px;height:44px}
+.profile-account-card{padding:14px;border-radius:16px}
+.profile-avatar{width:48px;height:48px;border-radius:14px}
+.profile-menu{gap:7px}
+.profile-menu-item{padding:11px;border-radius:14px}
+.profile-menu-item>span{width:40px;height:40px;border-radius:12px}
+.profile-menu-item strong{font-size:.9rem}
+.profile-menu-item small{font-size:.71rem}
+.profile-signout{min-height:46px}
+.profile-form-card{padding:15px}
+.phase5-profile-shell.profile-open .current-app-header{position:sticky;top:0}
+
+/* Consistent small-screen behaviour. */
+@media(max-width:560px){
+  :root{--jf-pad:13px}
+  .current-app-header{min-height:70px;padding:10px 13px}
+  .current-brand{font-size:21px;letter-spacing:2.2px}
+  .current-subbrand{font-size:8.5px}
+  .home-index{padding-top:16px}
+  .home-index-card{min-height:88px}
+  .fuel-v2-shell,.fuel-v2-page{padding-top:16px}
+  .fuel-v2-head h2{font-size:1.42rem}
+  .fuel-v2-head p{font-size:.84rem}
+  .race-v2-menu{top:68px}
+  .race-v2-card-main{grid-template-columns:72px minmax(0,1fr) auto}
+  .race-v2-date strong{font-size:.72rem}
+  .race-v2-card-copy h3{font-size:.94rem}
+  .race-v2-card-copy p{font-size:.72rem}
+  .profile-hub,.profile-page{padding-top:12px}
+}
+@media(max-width:390px){
+  .training-phase2-nav button{font-size:.64rem}
+  .race-v2-card-main{grid-template-columns:1fr auto}
+  .race-v2-date{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center}
+  .race-v2-card-copy{grid-column:1}
+  .race-v2-card-main>svg{grid-column:2}
+  .fuel-v2-summary-grid,.fuel-v2-session-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .product-body{padding:11px}
+  .product-body h3{font-size:1rem}
+  .product-body p{font-size:.75rem;margin-bottom:10px}
+  .product-body>b{font-size:1rem}
+}
+@media(max-width:340px){.product-grid{grid-template-columns:1fr}}
