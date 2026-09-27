@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, BarChart3, Gauge, HeartPulse, Timer, TrendingUp, Zap } from 'lucide-react';
+import { supabase } from './main';
 
 const DAY=24*60*60*1000;
 const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
@@ -54,8 +55,8 @@ function buildDaily(activities,profile,mode){
   const rows=[];let fitness=0,fatigue=0;
   for(let t=first.getTime();t<=today.getTime();t+=DAY){
     const d=new Date(t),load=byDay.get(dateKey(d))||0;
-    fitness+= (load-fitness)/42;
-    fatigue+= (load-fatigue)/7;
+    fitness+=(load-fitness)/42;
+    fatigue+=(load-fatigue)/7;
     rows.push({date:d,load,fitness,fatigue,form:fitness-fatigue});
   }
   return rows;
@@ -67,8 +68,22 @@ function linePath(rows,key,width=600,height=210,pad=22){
   return rows.map((r,i)=>{const x=pad+(i/Math.max(1,rows.length-1))*(width-pad*2);const y=height-pad-((Number(r[key])-min)/span)*(height-pad*2);return`${i?'L':'M'}${x.toFixed(1)} ${y.toFixed(1)}`}).join(' ');
 }
 
-export default function TrainingPerformance({activities=[],profile,loading=false,onRefresh}){
+export default function TrainingPerformance({activities=[],loading=false,onRefresh}){
   const[range,setRange]=useState(84);
+  const[profile,setProfile]=useState(null);
+  const[profileLoading,setProfileLoading]=useState(true);
+
+  useEffect(()=>{
+    let active=true;
+    (async()=>{
+      const{data:{session}}=await supabase.auth.getSession();
+      if(!session?.user){if(active)setProfileLoading(false);return}
+      const{data}=await supabase.from('training_profiles').select('*').eq('user_id',session.user.id).maybeSingle();
+      if(active){setProfile(data||null);setProfileLoading(false)}
+    })();
+    return()=>{active=false};
+  },[]);
+
   const data=useMemo(()=>{
     const clean=activities.filter(a=>!a.is_duplicate&&!a.exclude_from_analysis);
     const mode=chooseLoadMode(clean,profile);
@@ -78,12 +93,12 @@ export default function TrainingPerformance({activities=[],profile,loading=false
     const last7=daily.slice(-7).reduce((n,x)=>n+x.load,0),prev7=daily.slice(-14,-7).reduce((n,x)=>n+x.load,0);
     const recentStart=new Date();recentStart.setHours(0,0,0,0);recentStart.setDate(recentStart.getDate()-6);
     const recent=clean.filter(a=>{const d=activityDate(a.start_date_local||a.start_date);return d&&d>=recentStart});
-    const seconds=recent.reduce((n,a)=>n+Number(a.moving_time_s||0),0),distance=recent.reduce((n,a)=>n+Number(a.distance_m||0),0);
+    const seconds=recent.reduce((n,a)=>n+Number(a.moving_time_s||0),0);
     const weekly=[];const thisWeek=mondayStart(new Date());
     for(let i=7;i>=0;i--){const start=new Date(thisWeek.getTime()-i*7*DAY),end=new Date(start.getTime()+7*DAY);const rows=clean.filter(a=>{const d=activityDate(a.start_date_local||a.start_date);return d&&d>=start&&d<end});weekly.push({label:shortDate(start),load:rows.reduce((n,a)=>n+sessionLoad(a,profile,mode),0),hours:rows.reduce((n,a)=>n+Number(a.moving_time_s||0),0)/3600})}
     const fitnessPast=daily[Math.max(0,daily.length-29)]?.fitness||0;
     const wkg=Number(profile?.ftp_w)>0&&Number(profile?.weight_kg)>0?Number(profile.ftp_w)/Number(profile.weight_kg):null;
-    return{mode,daily,shown,latest,last7,prev7,recent,seconds,distance,weekly,fitnessPast,wkg};
+    return{mode,daily,shown,latest,last7,prev7,recent,seconds,weekly,fitnessPast,wkg};
   },[activities,profile,range]);
 
   const maxWeek=Math.max(1,...data.weekly.map(x=>x.load));
@@ -102,7 +117,7 @@ export default function TrainingPerformance({activities=[],profile,loading=false
   return <div className="stack training-performance-screen">
     <section className="card performance-head">
       <div className="row-between"><div><span className="eyebrow">MY PERFORMANCE</span><h2>Training balance</h2></div><button className="icon-btn" disabled={loading} onClick={onRefresh} aria-label="Refresh performance"><TrendingUp size={18}/></button></div>
-      <p className="muted">A simple view of what your downloaded training is doing over time. {modeLabel(data.mode)}.</p>
+      <p className="muted">A simple view of what your downloaded training is doing over time. {profileLoading?'Loading athlete details…':modeLabel(data.mode)+'.'}</p>
       <div className="performance-stat-grid">
         <div><span>Fitness</span><strong>{round(data.latest.fitness)}</strong><small>{fitnessChange==null?'Building baseline':`${fitnessChange>=0?'+':''}${round(fitnessChange)}% vs 4 weeks ago`}</small></div>
         <div><span>Fatigue</span><strong>{round(data.latest.fatigue)}</strong><small>Short-term load</small></div>
