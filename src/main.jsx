@@ -16,6 +16,7 @@ import './training-workout-details.css';
 import './training-simple-flow-v4.css';
 import './training-feedback.css';
 import './app-polish-v5.css';
+import './checkout-v6.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
