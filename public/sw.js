@@ -1,4 +1,4 @@
-const CACHE='just-fuel-v6';
+const CACHE='just-fuel-v7';
 const CORE=['/','/index.html','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
 
 self.addEventListener('install',event=>{
@@ -31,8 +31,9 @@ self.addEventListener('fetch',event=>{
   if(url.origin!==self.location.origin) return;
 
   if(request.mode==='navigate'){
+    const isStravaReturn=url.pathname==='/strava-return';
     event.respondWith(
-      fetch(new Request(request,{cache:'reload'}))
+      fetch(new Request(request,{cache:isStravaReturn?'no-store':'reload'}))
         .then(response=>{
           if(response.ok){
             const copy=response.clone();
