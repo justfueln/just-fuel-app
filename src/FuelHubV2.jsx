@@ -1,10 +1,10 @@
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {ArrowLeft,ChevronRight,Droplets,Fuel,Gauge,PackageCheck,RefreshCw,Save,ShoppingBag,SlidersHorizontal} from 'lucide-react';
 import {supabase} from './main';
 import {FuelBuilder} from './CommercePages';
 import TrainingFuelReview from './TrainingFuelReview';
 import {byKey} from './catalog';
-import {fetchTrainingFuelBase,fetchTrainingFuelForecast,fetchTrainingPlan} from './training-api';
+import {fetchFuelTrainingPlan,fetchTrainingFuelBase,fetchTrainingFuelForecast} from './training-api';
 import {hydratePacks,restockShortfalls} from './fuel-utils';
 import {FUEL_NAV,normalizeFuelView} from './navigation-registry';
 
@@ -13,6 +13,12 @@ const mins=v=>{const n=Math.max(0,Math.round(Number(v)||0)),h=Math.floor(n/60),m
 const todayKey=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const addDays=days=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);const p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const n=v=>Math.max(0,Number(v)||0);
+const friendlyFuelError=error=>{
+  if(!error)return'';
+  const text=String(error.message||error);
+  if(/statement timeout|canceling statement/i.test(text))return'Fuel forecast did not finish loading. Tap refresh to try again.';
+  return'Some fuel data could not load. Tap refresh to try again.';
+};
 
 const PRODUCT_ROWS=[
   ['bottle_mix','Bottle Mix','sachets'],
@@ -29,48 +35,78 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
   const[message,setMessage]=useState('');
   const[plan,setPlan]=useState([]);
   const[forecast,setForecast]=useState([]);
+  const[forecastReady,setForecastReady]=useState(false);
   const[stock,setStock]=useState([]);
   const[fuelProfile,setFuelProfile]=useState(null);
+  const mountedRef=useRef(true);
+  const autoLoadedUserRef=useRef('');
+  const loadPromiseRef=useRef(null);
 
   useEffect(()=>setView(normalizeFuelView(viewTarget)),[viewTarget]);
   useEffect(()=>{
+    mountedRef.current=true;
     let mounted=true;
-    supabase.auth.getSession().then(({data})=>{if(!mounted)return;setSession(data.session);if(data.session?.user)loadAll(data.session.user.id);else setLoading(false)});
-    const{data:sub}=supabase.auth.onAuthStateChange((_event,next)=>{setSession(next);if(next?.user)loadAll(next.user.id);else{setPlan([]);setForecast([]);setStock([]);setFuelProfile(null);setLoading(false)}});
-    return()=>{mounted=false;sub.subscription.unsubscribe()};
+    const clearUser=()=>{setPlan([]);setForecast([]);setForecastReady(false);setStock([]);setFuelProfile(null);setLoading(false)};
+    const autoLoad=next=>{
+      if(!mounted)return;
+      setSession(next||null);
+      const uid=next?.user?.id||'';
+      if(!uid){autoLoadedUserRef.current='';clearUser();return}
+      if(autoLoadedUserRef.current===uid)return;
+      autoLoadedUserRef.current=uid;
+      loadAll(uid);
+    };
+    supabase.auth.getSession().then(({data})=>autoLoad(data.session));
+    const{data:sub}=supabase.auth.onAuthStateChange((event,next)=>{
+      if(!mounted)return;
+      setSession(next||null);
+      if(event==='TOKEN_REFRESHED'&&next?.user?.id===autoLoadedUserRef.current)return;
+      autoLoad(next);
+    });
+    return()=>{mounted=false;mountedRef.current=false;sub.subscription.unsubscribe()};
   },[]);
 
   async function loadAll(userId=session?.user?.id){
     if(!userId)return;
-    setLoading(true);setMessage('');
-    const[planResult,baseResult,forecastResult]=await Promise.all([
-      fetchTrainingPlan(supabase,userId),fetchTrainingFuelBase(supabase,userId),fetchTrainingFuelForecast(supabase,userId)
-    ]);
-    const error=planResult.error||baseResult.error||forecastResult.error;
-    if(error)setMessage(error.message);
-    setPlan(planResult.plan||[]);setStock(baseResult.stock||[]);setFuelProfile(baseResult.fuelProfile||null);setForecast(forecastResult.fuel||[]);
-    setLoading(false);
+    if(loadPromiseRef.current)return loadPromiseRef.current;
+    const task=(async()=>{
+      if(mountedRef.current){setLoading(true);setMessage('')}
+      const[planResult,baseResult,forecastResult]=await Promise.all([
+        fetchFuelTrainingPlan(supabase,userId),fetchTrainingFuelBase(supabase,userId),fetchTrainingFuelForecast(supabase,userId)
+      ]);
+      if(!mountedRef.current)return;
+      const error=planResult.error||baseResult.error||forecastResult.error;
+      if(error)setMessage(friendlyFuelError(error));
+      setPlan(planResult.plan||[]);
+      setStock(baseResult.stock||[]);
+      setFuelProfile(baseResult.fuelProfile||null);
+      setForecast(forecastResult.fuel||[]);
+      setForecastReady(!forecastResult.error);
+      setLoading(false);
+    })();
+    loadPromiseRef.current=task;
+    try{return await task}finally{if(loadPromiseRef.current===task)loadPromiseRef.current=null}
   }
 
   function go(next){
     const id=normalizeFuelView(next);
     setView(id);onViewChange?.(id);
     window.history.pushState({...window.history.state,jfSection:'fuel',jfFuelView:id,jfBasket:false},'',window.location.href);
-    window.scrollTo({top:0,behavior:'smooth'});
+    window.scrollTo({top:0,behavior:'auto'});
   }
   function back(){if(view==='home')return;window.history.back()}
 
   const futurePlan=useMemo(()=>plan.filter(row=>row.session_date>=todayKey()),[plan]);
   const week=useMemo(()=>futurePlan.filter(row=>row.session_date<addDays(7)),[futurePlan]);
   const weekTotals=useMemo(()=>tallySessions(week),[week]);
-  const weekShortfalls=useMemo(()=>restockShortfalls(forecast.filter(x=>Number(x.horizon_days)===7)),[forecast]);
-  const shortfallUnits=useMemo(()=>orderUnits(weekShortfalls),[weekShortfalls]);
+  const weekShortfalls=useMemo(()=>forecastReady?restockShortfalls(forecast.filter(x=>Number(x.horizon_days)===7)):({}),[forecast,forecastReady]);
+  const shortfallUnits=useMemo(()=>forecastReady?orderUnits(weekShortfalls):0,[weekShortfalls,forecastReady]);
 
   if(view==='planner')return <FuelPageFrame title="Quick Fuel Planner" subtitle="Build a simple session fuel plan." onBack={back}><FuelBuilder addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
   if(view==='review')return <FuelPageFrame title="Fuel Review" subtitle="Compare planned fuel with what you actually used." onBack={back}><TrainingFuelReview/></FuelPageFrame>;
   if(view==='training')return <FuelPageFrame title="Training Fuel" subtitle="What your upcoming training requires." onBack={back}><TrainingFuel plan={futurePlan} fuelProfile={fuelProfile} userId={session?.user?.id} reload={loadAll} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
   if(view==='stock')return <FuelPageFrame title="My Stock" subtitle="Keep your cupboard stock up to date." onBack={back}><StockPage session={session} stock={stock} reload={loadAll}/></FuelPageFrame>;
-  if(view==='order')return <FuelPageFrame title="Order Needed" subtitle="Only the shortfall for your selected training horizon." onBack={back}><OrderNeeded forecast={forecast} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
+  if(view==='order')return <FuelPageFrame title="Order Needed" subtitle="Only the shortfall for your selected training horizon." onBack={back}><OrderNeeded forecast={forecastReady?forecast:[]} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
 
   return <div className="fuel-v2-shell">
     <header className="fuel-v2-head">
@@ -86,7 +122,7 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
       <div className="fuel-v2-summary-grid">
         <span><b>{weekTotals.mix}</b>Bottle Mix</span><span><b>{weekTotals.regular+weekTotals.boost}</b>Total gels</span><span><b>{weekTotals.boost}</b>Boost</span><span><b>{weekTotals.recover}</b>Recover</span>
       </div>
-      <div className={`fuel-v2-stock-callout ${shortfallUnits?'needs-order':'ready'}`}><PackageCheck size={19}/><div><strong>{shortfallUnits?`${shortfallUnits} unit${shortfallUnits===1?'':'s'} short`:'Stock covers the 7-day forecast'}</strong><small>{shortfallUnits?'Open Order Needed to see the exact shortfall.':'Keep My Stock updated for accurate forecasting.'}</small></div></div>
+      {!forecastReady?<div className="fuel-v2-stock-callout needs-order"><RefreshCw size={19}/><div><strong>{loading?'Updating stock forecast…':'Stock forecast not loaded'}</strong><small>{loading?'This should only take a moment.':'Tap refresh to try again.'}</small></div></div>:<div className={`fuel-v2-stock-callout ${shortfallUnits?'needs-order':'ready'}`}><PackageCheck size={19}/><div><strong>{shortfallUnits?`${shortfallUnits} unit${shortfallUnits===1?'':'s'} short`:'Stock covers the 7-day forecast'}</strong><small>{shortfallUnits?'Open Order Needed to see the exact shortfall.':'Keep My Stock updated for accurate forecasting.'}</small></div></div>}
     </section>}
 
     <div className="fuel-v2-menu">
