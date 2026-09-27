@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, BarChart3, Gauge, HeartPulse, Timer, TrendingUp, Zap } from 'lucide-react';
+import { Activity, BarChart3, BrainCircuit, Gauge, HeartPulse, Timer, TrendingUp, Zap } from 'lucide-react';
 import { supabase } from './main';
 
 const DAY=24*60*60*1000;
@@ -14,6 +14,7 @@ function activityDate(value){
 function dateKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function mondayStart(d){const x=new Date(d);x.setHours(0,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
 function shortDate(d){return new Intl.DateTimeFormat('en-ZA',{day:'numeric',month:'short'}).format(d)}
+function shortReadinessDate(v){const d=new Date(`${String(v).slice(0,10)}T12:00:00`);return Number.isNaN(d.getTime())?'—':new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric'}).format(d)}
 function duration(seconds){const total=Math.max(0,Number(seconds)||0),h=Math.floor(total/3600),m=Math.round((total%3600)/60);return h?`${h}h ${m}m`:`${m}m`}
 function round(n,d=0){const p=10**d;return Math.round((Number(n)||0)*p)/p}
 
@@ -72,14 +73,22 @@ export default function TrainingPerformance({activities=[],loading=false,onRefre
   const[range,setRange]=useState(84);
   const[profile,setProfile]=useState(null);
   const[profileLoading,setProfileLoading]=useState(true);
+  const[readiness,setReadiness]=useState(null);
 
   useEffect(()=>{
     let active=true;
     (async()=>{
       const{data:{session}}=await supabase.auth.getSession();
       if(!session?.user){if(active)setProfileLoading(false);return}
-      const{data}=await supabase.from('training_profiles').select('*').eq('user_id',session.user.id).maybeSingle();
-      if(active){setProfile(data||null);setProfileLoading(false)}
+      const[profileResult,readinessResult]=await Promise.all([
+        supabase.from('training_profiles').select('*').eq('user_id',session.user.id).maybeSingle(),
+        supabase.rpc('get_training_readiness_insights',{p_user_id:session.user.id})
+      ]);
+      if(active){
+        setProfile(profileResult.data||null);
+        setReadiness(readinessResult.error?null:readinessResult.data||null);
+        setProfileLoading(false);
+      }
     })();
     return()=>{active=false};
   },[]);
@@ -114,6 +123,12 @@ export default function TrainingPerformance({activities=[],loading=false,onRefre
     return'Training load and longer-term fitness are reasonably balanced. Stay consistent rather than adding unnecessary intensity.';
   },[activities.length,loadChange,data.latest.form,fitnessChange]);
 
+  const readinessSummary=readiness?.summary||{};
+  const readinessHistory=Array.isArray(readiness?.history)?readiness.history:[];
+  const readinessShown=readinessHistory.slice(-14);
+  const readinessPatterns=Array.isArray(readiness?.patterns)?readiness.patterns:[];
+  const readinessTrend=readinessSummary.trend==='improving'?'Improving':readinessSummary.trend==='declining'?'Declining':readinessSummary.trend==='steady'?'Steady':'Building baseline';
+
   return <div className="stack training-performance-screen">
     <section className="card performance-head">
       <div className="row-between"><div><span className="eyebrow">MY PERFORMANCE</span><h2>Training balance</h2></div><button className="icon-btn" disabled={loading} onClick={onRefresh} aria-label="Refresh performance"><TrendingUp size={18}/></button></div>
@@ -127,6 +142,21 @@ export default function TrainingPerformance({activities=[],loading=false,onRefre
     </section>
 
     <section className="card coach-card"><span className="eyebrow">COACH SAYS</span><h3>{coach}</h3><p className="muted">This is a coaching signal from downloaded training, not a medical readiness assessment.</p></section>
+
+    <section className="card readiness-history-card">
+      <div className="row-between"><div><span className="eyebrow">READINESS HISTORY</span><h3>How your body is responding</h3></div><BrainCircuit size={22}/></div>
+      <p className="muted">Morning check-ins are compared with your recent training load so the coach can learn your normal recovery pattern over time.</p>
+      <div className="readiness-history-stats">
+        <div><span>7-day average</span><strong>{readinessSummary.avg_7d!=null?`${round(readinessSummary.avg_7d)}/100`:'—'}</strong><small>{readinessTrend}</small></div>
+        <div><span>28-day average</span><strong>{readinessSummary.avg_28d!=null?`${round(readinessSummary.avg_28d)}/100`:'—'}</strong><small>{Number(readinessSummary.checkins_28d)||0} check-ins</small></div>
+        <div><span>Caution / recovery</span><strong>{Number(readinessSummary.low_days_28d)||0}</strong><small>Last 28 days</small></div>
+      </div>
+      {readinessShown.length?<div className="readiness-history-bars">{readinessShown.map((x,i)=><div className="readiness-history-day" key={`${x.date}-${i}`} title={`${shortReadinessDate(x.date)} · ${round(x.score)}/100`}><span>{round(x.score)}</span><div><i className={`readiness-history-fill ${x.status||'ready'}`} style={{height:`${Math.max(8,Math.min(100,Number(x.score)||0))}%`}}/></div><small>{shortReadinessDate(x.date).split(' ')[0]}</small></div>)}</div>:<div className="readiness-empty">Complete your morning check-in on Home to start building your readiness history.</div>}
+      <div className="readiness-learning">
+        <span className="eyebrow">WHAT THE COACH IS LEARNING</span>
+        {readinessPatterns.map((p,i)=><div className="readiness-learning-row" key={`${p.type||'pattern'}-${i}`}><b>{p.strength==='strong'?'Established pattern':p.strength==='emerging'?'Emerging pattern':'Building baseline'}</b><p>{p.message}</p></div>)}
+      </div>
+    </section>
 
     <section className="card performance-chart-card">
       <div className="row-between"><div><span className="eyebrow">FITNESS / FATIGUE</span><h3>Training trend</h3></div><Gauge size={22}/></div>
