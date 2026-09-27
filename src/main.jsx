@@ -18,6 +18,7 @@ import './training-simple-flow-v4.css';
 import './training-feedback.css';
 import './app-polish-v5.css';
 import './checkout-v6.css';
+import './current-shell-v4.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
@@ -43,19 +44,15 @@ if ('serviceWorker' in navigator) {
     });
 
     try {
-      // Version the worker URL as well as its internal cache name. This makes
-      // Android/PWA installs fetch the newest worker immediately after deploys.
-      const registration = await navigator.serviceWorker.register('/sw.js?v=9', {
+      const registration = await navigator.serviceWorker.register('/sw.js?v=10', {
         scope: '/',
         updateViaCache: 'none'
       });
       await registration.update();
 
-      // Clean up legacy Just Fuel caches from older deployments in case an
-      // installed PWA retained one before the new worker gained control.
       if ('caches' in window) {
         const keys = await caches.keys();
-        await Promise.all(keys.filter(key => key.startsWith('just-fuel-') && key !== 'just-fuel-v9').map(key => caches.delete(key)));
+        await Promise.all(keys.filter(key => key.startsWith('just-fuel-')).map(key => caches.delete(key)));
       }
 
       const refreshServiceWorker = () => {
