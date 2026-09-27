@@ -22,7 +22,7 @@ jobs:
       - name: Apply race calendar
         run: node scripts/add-race-calendar.mjs
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Run tests
         run: npm test
       - name: Build production app
