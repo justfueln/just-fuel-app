@@ -14,6 +14,7 @@ import './training-fuel.css';
 import './training-boost-control.css';
 import './season-v3.css';
 import './race-guide-v1.css';
+import './stage-race-planner.css';
 import './training-workout-details.css';
 import './training-simple-flow-v4.css';
 import './training-plan-compare.css';
