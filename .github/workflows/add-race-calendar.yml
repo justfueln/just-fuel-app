@@ -1,0 +1,40 @@
+name: Add race calendar
+
+on:
+  push:
+    branches:
+      - race-calendar
+    paths:
+      - '.github/workflows/add-race-calendar.yml'
+      - 'scripts/add-race-calendar.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: race-calendar
+          fetch-depth: 0
+      - name: Apply race calendar
+        run: node scripts/add-race-calendar.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Build production app
+        run: npm run build
+      - name: Commit verified source changes
+        run: |
+          if git diff --quiet -- src/AppV3.jsx src/season-v3.css; then
+            echo "No source changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/AppV3.jsx src/season-v3.css
+          git commit -m "Add race calendar to My Race [skip ci]"
+          git push origin race-calendar
