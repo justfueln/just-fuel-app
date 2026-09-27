@@ -29,6 +29,7 @@ import './navigation-v1.css';
 import './navigation-v2.css';
 import './race-hub-v2.css';
 import './race-hub-v2-bridge.css';
+import './fuel-hub-v2.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
