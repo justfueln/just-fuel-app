@@ -95,13 +95,15 @@ export default function ShellNextV3(){
   },[basket]);
 
   useEffect(()=>{
+    const syncBasket=()=>setBasket(loadBasket());
+    const open=()=>{syncBasket();setBasketOpen(true)};
     if(sessionStorage.getItem('jf-open-basket-after-reload')==='1'){
       sessionStorage.removeItem('jf-open-basket-after-reload');
-      setBasket(loadBasket()); setBasketOpen(true);
+      open();
     }
-    const open=()=>{setBasket(loadBasket());setBasketOpen(true)};
+    window.addEventListener('jf-basket-updated',syncBasket);
     window.addEventListener('jf-open-basket',open);
-    return ()=>window.removeEventListener('jf-open-basket',open);
+    return ()=>{window.removeEventListener('jf-basket-updated',syncBasket);window.removeEventListener('jf-open-basket',open)};
   },[]);
 
   useEffect(()=>{
