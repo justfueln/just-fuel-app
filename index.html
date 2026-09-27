@@ -8,13 +8,53 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Just Fuel" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="manifest" href="/manifest.webmanifest?v=11" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <title>Just Fuel</title>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script>
+      window.__JF_BOOT_CLEANUP__ = (async function () {
+        try {
+          var marker = 'jf-clean-current-app-v11';
+          if (sessionStorage.getItem(marker) === '1') return;
+
+          var registrations = [];
+          if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
+            registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map(function (registration) {
+              return registration.unregister().catch(function () { return false; });
+            }));
+          }
+
+          var cacheNames = [];
+          if ('caches' in window && caches.keys) {
+            cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(function (name) {
+              return caches.delete(name).catch(function () { return false; });
+            }));
+          }
+
+          sessionStorage.setItem(marker, '1');
+
+          // If an old worker/cache existed, reload once after removing it so
+          // this page cannot keep executing a retired application bundle.
+          if (registrations.length || cacheNames.length || navigator.serviceWorker?.controller) {
+            var url = new URL(window.location.href);
+            url.searchParams.set('jfapp', '11');
+            window.location.replace(url.pathname + url.search + url.hash);
+            await new Promise(function () {});
+          }
+        } catch (error) {
+          console.warn('Just Fuel app cleanup:', error);
+        }
+      })();
+    </script>
+    <script type="module">
+      await window.__JF_BOOT_CLEANUP__;
+      await import('/src/main.jsx');
+    </script>
   </body>
 </html>
