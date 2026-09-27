@@ -9,8 +9,6 @@ export const APP_ROUTES={
 export const BOTTOM_NAV=['home','training','race','fuel','shop'];
 export const MAIN_ROUTE_IDS=BOTTOM_NAV.slice();
 
-// Phase 2 athlete-facing Training navigation. Race, Fuel and Athlete Details
-// remain supported legacy views, but they are no longer exposed as Training tabs.
 export const TRAINING_NAV=[
   {id:'plan',label:'Plan',legacyTab:'My Plan',subView:null},
   {id:'history',label:'History',legacyTab:'History',subView:'History'},
@@ -18,8 +16,19 @@ export const TRAINING_NAV=[
   {id:'review',label:'Review',legacyTab:'History',subView:'Compare'}
 ];
 
-// AppV3 still uses these legacy tab identifiers internally while the navigation
-// is progressively moved into the central registry.
+// Phase 3 Race navigation. Stage pages are conditional and only shown for
+// multi-day/stage events. Stable IDs keep visible wording independent of state.
+export const RACE_NAV=[
+  {id:'races',label:'My Races'},
+  {id:'registry',label:'Event Registry'},
+  {id:'overview',label:'Overview'},
+  {id:'stages',label:'Stages',stageOnly:true},
+  {id:'stage',label:'Stage',stageOnly:true,detail:true},
+  {id:'fuel',label:'Fuel & Hydration'},
+  {id:'water',label:'Water Points'},
+  {id:'checklist',label:'Checklist'}
+];
+
 export const TRAINING_VIEWS=[
   {id:'overview',label:'Overview',legacy:'Overview',area:'training'},
   {id:'plan',label:'Plan',legacy:'My Plan',area:'training'},
