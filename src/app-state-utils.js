@@ -1,5 +1,5 @@
 export const MAIN_SECTIONS=['Plan','Learn','Shop','Training','More'];
-export const TRAINING_TABS=['Overview','My Plan','History','My Race','Fuel','My Details'];
+export const TRAINING_TABS=['Overview','My Plan','History','Performance','My Race','Fuel','My Details'];
 export const basketTtlMs=14*24*60*60*1000;
 export const lastBasketTtlMs=60*24*60*60*1000;
 
