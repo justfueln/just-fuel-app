@@ -16,6 +16,22 @@ export async function fetchTrainingPlan(client,userId){
   return{plan:error?[]:activePlanId?(calendar.data||[]).filter(x=>x.plan_id===activePlanId):[],error};
 }
 
+export async function fetchFuelTrainingPlan(client,userId){
+  const active=await client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle();
+  if(active.error)return{plan:[],error:active.error};
+  const activePlanId=active.data?.id;
+  if(!activePlanId)return{plan:[],error:null};
+  const today=new Date(),p=n=>String(n).padStart(2,'0');
+  const todayKey=`${today.getFullYear()}-${p(today.getMonth()+1)}-${p(today.getDate())}`;
+  const result=await client.from('training_session_fuel_plan')
+    .select('session_id,plan_id,session_date,title,duration_minutes,status,carb_target_gph,bottle_mix_sachets,regular_gels,boost_gels,recover_servings')
+    .eq('user_id',userId)
+    .eq('plan_id',activePlanId)
+    .gte('session_date',todayKey)
+    .order('session_date',{ascending:true});
+  return{plan:result.error?[]:(result.data||[]).map(row=>({...row,id:row.session_id})),error:result.error||null};
+}
+
 export async function fetchTrainingRaces(client,userId){
   const result=await client.from('athlete_season_events').select('*').eq('user_id',userId).order('event_date',{ascending:true});
   return{races:result.data||[],error:result.error||null};
@@ -35,9 +51,6 @@ export async function fetchTrainingFuelBase(client,userId){
 }
 
 export async function fetchTrainingFuelForecast(client,userId){
-  // The old fuel_forecast_usage view expanded forecast events for every athlete
-  // before the API filter was applied and could hit Postgres statement_timeout.
-  // This RPC scopes the calculation to one athlete from the start.
   const result=await client.rpc('get_training_fuel_forecast',{p_user_id:userId});
   return{fuel:result.data||[],error:result.error||null};
 }
