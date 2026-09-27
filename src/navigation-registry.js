@@ -1,6 +1,6 @@
 export const APP_ROUTES={
   home:{id:'home',label:'Home',trainingTab:null},
-  training:{id:'training',label:'Training',trainingTab:'Overview'},
+  training:{id:'training',label:'Training',trainingTab:'My Plan'},
   race:{id:'race',label:'Race',trainingTab:'My Race'},
   fuel:{id:'fuel',label:'Fuel',trainingTab:'Fuel'},
   shop:{id:'shop',label:'Shop',trainingTab:null}
@@ -9,13 +9,24 @@ export const APP_ROUTES={
 export const BOTTOM_NAV=['home','training','race','fuel','shop'];
 export const MAIN_ROUTE_IDS=BOTTOM_NAV.slice();
 
+// Phase 2 athlete-facing Training navigation. Race, Fuel and Athlete Details
+// remain supported legacy views, but they are no longer exposed as Training tabs.
+export const TRAINING_NAV=[
+  {id:'plan',label:'Plan',legacyTab:'My Plan',subView:null},
+  {id:'history',label:'History',legacyTab:'History',subView:'History'},
+  {id:'performance',label:'Performance',legacyTab:'History',subView:'Performance'},
+  {id:'review',label:'Review',legacyTab:'History',subView:'Compare'}
+];
+
+// AppV3 still uses these legacy tab identifiers internally while the navigation
+// is progressively moved into the central registry.
 export const TRAINING_VIEWS=[
   {id:'overview',label:'Overview',legacy:'Overview',area:'training'},
-  {id:'plan',label:'My Plan',legacy:'My Plan',area:'training'},
+  {id:'plan',label:'Plan',legacy:'My Plan',area:'training'},
   {id:'history',label:'History',legacy:'History',area:'training'},
-  {id:'race',label:'My Race',legacy:'My Race',area:'race'},
+  {id:'race',label:'Race',legacy:'My Race',area:'race'},
   {id:'fuel',label:'Fuel',legacy:'Fuel',area:'fuel'},
-  {id:'details',label:'My Details',legacy:'My Details',area:'training'}
+  {id:'details',label:'Athlete Details',legacy:'My Details',area:'profile'}
 ];
 
 export const TRAINING_TABS=TRAINING_VIEWS.map(x=>x.legacy);
@@ -40,7 +51,33 @@ export function normalizeTrainingLegacy(value){
   const direct=TRAINING_VIEWS.find(x=>x.legacy===value||x.id===value||x.label===value);
   if(direct)return direct.legacy;
   if(value==='My Season')return'My Race';
-  return'Overview';
+  if(value==='Performance'||value==='Review'||value==='Compare')return'History';
+  return'My Plan';
+}
+
+export function normalizeTrainingView(value){
+  const aliases={
+    plan:'plan','My Plan':'plan',
+    history:'history',History:'history',
+    performance:'performance',Performance:'performance',
+    review:'review',Review:'review',Compare:'review','Plan vs Actual':'review'
+  };
+  return aliases[value]||'plan';
+}
+
+export function trainingTargetForView(value){
+  const id=normalizeTrainingView(value);
+  return TRAINING_NAV.find(item=>item.id===id)||TRAINING_NAV[0];
+}
+
+export function trainingViewFromState(state={}){
+  if(state?.jfTrainingView)return normalizeTrainingView(state.jfTrainingView);
+  if(state?.jfTrainingTab==='History'){
+    if(state?.jfTrainingSubView==='Performance')return'performance';
+    if(state?.jfTrainingSubView==='Compare')return'review';
+    return'history';
+  }
+  return'plan';
 }
 
 export function appAreaForTrainingTab(value){
