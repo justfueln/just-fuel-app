@@ -1,20 +1,22 @@
-export const MAIN_SECTIONS=['Plan','Learn','Shop','Training','More'];
-export const TRAINING_TABS=['Overview','My Plan','History','My Race','Fuel','My Details'];
+import {MAIN_ROUTE_IDS,TRAINING_TABS,normalizeMainRoute,normalizeTrainingLegacy} from './navigation-registry';
+
+export const MAIN_SECTIONS=MAIN_ROUTE_IDS;
+export {TRAINING_TABS};
 export const basketTtlMs=14*24*60*60*1000;
 export const lastBasketTtlMs=60*24*60*60*1000;
 
 export function normalizeMainSection(value){
-  return MAIN_SECTIONS.includes(value)?value:'Plan';
+  return normalizeMainRoute(value);
 }
 
 export function normalizeTrainingTab(value){
-  return TRAINING_TABS.includes(value)?value:'Overview';
+  return normalizeTrainingLegacy(value);
 }
 
 export function resolveInitialMainSection({historyState,search='',pathname='',returnSection=''}={}){
   const params=new URLSearchParams(search||'');
-  if(pathname==='/strava-return'||params.has('strava'))return'Training';
-  if(returnSection==='Training')return'Training';
+  if(pathname==='/strava-return'||params.has('strava'))return'training';
+  if(returnSection==='Training'||returnSection==='training')return'training';
   return normalizeMainSection(historyState?.jfSection);
 }
 
