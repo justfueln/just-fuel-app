@@ -6,6 +6,11 @@ export async function fetchTrainingCore(client,userId){
   return{setup:setup.data||null,home:home.data||null,error:setup.error||home.error||null};
 }
 
+export async function fetchTodayDashboard(client,today){
+  const result=await client.rpc('get_today_dashboard',{p_today:today});
+  return{dashboard:result.data||{},error:result.error||null};
+}
+
 export async function fetchTrainingPlan(client,userId){
   const[calendar,active]=await Promise.all([
     client.from('training_plan_calendar_with_fuel').select('*').eq('user_id',userId).order('session_date',{ascending:true}),
