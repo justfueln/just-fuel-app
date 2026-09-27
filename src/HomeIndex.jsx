@@ -8,8 +8,8 @@ export default function HomeIndex({goRoute}){
   return <main className="home-index">
     <section className="home-index-hero">
       <span className="home-index-kicker">JUST FUEL</span>
-      <h1>Everything in one place.</h1>
-      <p>Training, race planning, fueling and ordering — organised around what you need to do next.</p>
+      <h1>Train. Race. Fuel.</h1>
+      <p>Open the section you need. Everything else stays out of the way.</p>
     </section>
     <section className="home-index-primary">
       {HOME_INDEX_ITEMS.map(item=>{
