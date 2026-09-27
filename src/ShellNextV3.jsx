@@ -14,7 +14,6 @@ const BASKET_KEY = 'just-fuel-basket-v3';
 const LAST_BASKET_KEY = 'just-fuel-last-basket-v1';
 const BASKET_TTL = basketTtlMs;
 const LAST_BASKET_TTL = lastBasketTtlMs;
-const LAST_SECTION_KEY = 'just-fuel-last-section';
 
 function loadBasket(){
   try{const raw=localStorage.getItem(BASKET_KEY);const items=readSavedItems(raw,BASKET_TTL);if(raw&&!items.length)localStorage.removeItem(BASKET_KEY);return items}catch{return[]}
@@ -24,7 +23,7 @@ function loadLastBasket(){
 }
 
 export default function ShellNextV3(){
-  const [section,setSectionState]=useState(()=>normalizeMainSection(window.history.state?.jfSection||localStorage.getItem(LAST_SECTION_KEY)||'Plan'));
+  const [section,setSectionState]=useState(()=>normalizeMainSection(window.history.state?.jfSection||'Plan'));
   const [basket,setBasket]=useState(loadBasket);
   const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
@@ -32,7 +31,7 @@ export default function ShellNextV3(){
   const [installPrompt,setInstallPrompt]=useState(null);
   const [installed,setInstalled]=useState(false);
 
-  function applySection(value){const next=normalizeMainSection(value);setSectionState(next);localStorage.setItem(LAST_SECTION_KEY,next);return next}
+  function applySection(value){const next=normalizeMainSection(value);setSectionState(next);return next}
   function setSection(value){const next=normalizeMainSection(value);if(next===section)return;setBasketOpen(false);applySection(next);window.history.pushState({...window.history.state,jfSection:next,jfBasket:false},'',window.location.href)}
   function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
@@ -41,7 +40,7 @@ export default function ShellNextV3(){
 
   useEffect(()=>{
     if(!window.history.state?.jfSection)window.history.replaceState({...window.history.state,jfSection:section,jfBasket:false},'',window.location.href);
-    const onPop=e=>{const next=normalizeMainSection(e.state?.jfSection||localStorage.getItem(LAST_SECTION_KEY)||'Plan');setSectionState(next);localStorage.setItem(LAST_SECTION_KEY,next);setBasketOpen(Boolean(e.state?.jfBasket))};
+    const onPop=e=>{const next=normalizeMainSection(e.state?.jfSection||'Plan');setSectionState(next);setBasketOpen(Boolean(e.state?.jfBasket))};
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
 
