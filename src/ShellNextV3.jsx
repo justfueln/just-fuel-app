@@ -23,7 +23,7 @@ function loadLastBasket(){
 }
 
 export default function ShellNextV3(){
-  const [section,setSectionState]=useState(()=>normalizeMainSection(window.history.state?.jfSection||'Plan'));
+  const [section,setSectionState]=useState('Plan');
   const [basket,setBasket]=useState(loadBasket);
   const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
@@ -39,7 +39,7 @@ export default function ShellNextV3(){
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
 
   useEffect(()=>{
-    if(!window.history.state?.jfSection)window.history.replaceState({...window.history.state,jfSection:section,jfBasket:false},'',window.location.href);
+    window.history.replaceState({...window.history.state,jfSection:'Plan',jfBasket:false},'',window.location.href);
     const onPop=e=>{const next=normalizeMainSection(e.state?.jfSection||'Plan');setSectionState(next);setBasketOpen(Boolean(e.state?.jfBasket))};
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
