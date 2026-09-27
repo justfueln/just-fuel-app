@@ -1,0 +1,1 @@
+.season-screen:has(> .race-v2-shell)>:not(.race-v2-shell){display:none!important}.season-screen:has(> .race-v2-shell){gap:0!important}.race-v2-shell{width:100%;max-width:100%;padding-bottom:10px}.race-v2-shell .card{max-width:100%;min-width:0}.race-v2-shell button,.race-v2-shell select,.race-v2-shell input{max-width:100%}
