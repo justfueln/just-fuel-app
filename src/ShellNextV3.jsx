@@ -5,6 +5,7 @@ import {
   Store, Trash2, Truck, X
 } from 'lucide-react';
 import TrainingApp from './App';
+import CheckoutDrawer from './CheckoutDrawer';
 import {
   CATALOG, FREE_PUDO_THRESHOLD, SHOP_DOMAIN, WHATSAPP_NUMBER,
   byKey, money, numericVariantId
@@ -181,7 +182,7 @@ export default function ShellNextV3(){
     </div>
 
     <nav className="bottom-nav" aria-label="Main navigation">{NAV.map(([label,Icon])=><button key={label} className={section===label?'active':''} onClick={()=>setSection(label)}><Icon size={25}/><span>{label}</span></button>)}</nav>
-    <BasketDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
+    <CheckoutDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
   </div>
 }
 
@@ -280,15 +281,6 @@ function ShopPage({addLine,openBasket}){
       {added&&<div className="shop-added-message"><Check size={17}/>{added}<button onClick={openBasket}>View basket</button></div>}
     </section>
   </main>
-}
-
-function BasketDrawer({open,close,basket,lastBasket,repeatLastBasket,remember,count,total,setQty,clear}){
-  const remaining=Math.max(0,FREE_PUDO_THRESHOLD-total),progress=Math.min(100,(total/FREE_PUDO_THRESHOLD)*100);
-  const previousCount=lastBasket.reduce((n,x)=>n+Number(x.quantity||0),0);
-  function checkoutOnline(){if(!basket.length)return;remember(basket);const lines=basket.map(x=>`${numericVariantId(x.variantId)}:${x.quantity}`).join(',');window.location.assign(`${SHOP_DOMAIN}/cart/${lines}?ref=just-fuel-app`)}
-  function checkoutWhatsApp(){if(!basket.length)return;remember(basket);const lines=basket.map(x=>`• ${x.productTitle} — ${x.variantTitle} × ${x.quantity} — ${money(x.price*x.quantity)}`);const text=['Hi Just Fuel, I would like to place an order:','',...lines,'',`Order total: ${money(total)}`,total>=FREE_PUDO_THRESHOLD?'PUDO: Free over R600':'PUDO: R75 below R600','','Please confirm availability and collection / delivery details.'].join('\n');window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`,'_blank','noopener,noreferrer')}
-  if(!open)return null;
-  return <div className="basket-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><aside className="basket-drawer"><div className="basket-head"><div><span className="eyebrow-light">YOUR BASKET</span><h2>{count} {count===1?'item':'items'}</h2></div><button onClick={close} className="basket-close"><X size={24}/></button></div>{basket.length===0?<div className="basket-empty"><ShoppingBag size={36}/><h3>Your basket is empty</h3><p>Add fuel from Shop, Plan or Training.</p>{lastBasket.length>0&&<button className="repeat-basket" onClick={repeatLastBasket}><ShoppingBag size={17}/>Repeat previous basket · {previousCount} item{previousCount===1?'':'s'}</button>}</div>:<><div className="basket-lines">{basket.map(line=><div className="basket-line" key={line.variantId}><img src={line.image} alt=""/><div className="basket-line-main"><strong>{line.productTitle}</strong><span>{line.variantTitle}</span><b>{money(line.price*line.quantity)}</b></div><div className="basket-line-actions"><button onClick={()=>setQty(line.variantId,line.quantity-1)}><Minus size={15}/></button><span>{line.quantity}</span><button onClick={()=>setQty(line.variantId,line.quantity+1)}><Plus size={15}/></button><button className="remove" onClick={()=>setQty(line.variantId,0)}><Trash2 size={16}/></button></div></div>)}</div><div className="delivery-progress"><div className="progress-copy">{remaining>0?<><b>{money(remaining)}</b> away from free PUDO delivery</>:<b>Free PUDO delivery unlocked</b>}</div><div className="progress-track"><span style={{width:`${progress}%`}}/></div></div><div className="basket-total"><span>Total</span><strong>{money(total)}</strong></div><button className="checkout-online" onClick={checkoutOnline}><CreditCard size={19}/>Online checkout</button><button className="checkout-whatsapp" onClick={checkoutWhatsApp}><MessageCircle size={19}/>WhatsApp checkout</button><button className="clear-basket" onClick={clear}>Clear basket</button></>}<p className="basket-expiry">Basket stays saved for 14 days of inactivity.</p></aside></div>
 }
 
 function LearnPage(){

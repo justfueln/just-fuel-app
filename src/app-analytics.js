@@ -1,6 +1,7 @@
 const ENDPOINT='https://ufolqntrfmvefpvrjnsa.supabase.co/functions/v1/app-analytics-event';
 const CLIENT_KEY='jf-analytics-client-v1';
 const SESSION_KEY='jf-analytics-session-v1';
+const ATTRIBUTION_KEY='jf-analytics-attribution-v1';
 const BASKET_KEY='just-fuel-basket-v3';
 
 function id(prefix){
@@ -41,6 +42,29 @@ function cleanMeta(meta={}){
   }
   return out;
 }
+function safeReferrerHost(){
+  try{return document.referrer?new URL(document.referrer).host.slice(0,120):''}catch{return''}
+}
+function readAttribution(){
+  try{
+    const saved=JSON.parse(sessionStorage.getItem(ATTRIBUTION_KEY)||'null');
+    if(saved&&typeof saved==='object')return saved;
+    const q=new URLSearchParams(location.search);
+    const data=cleanMeta({
+      utm_source:q.get('utm_source')||'',
+      utm_medium:q.get('utm_medium')||'',
+      utm_campaign:q.get('utm_campaign')||'',
+      utm_content:q.get('utm_content')||'',
+      utm_term:q.get('utm_term')||'',
+      referrer_host:safeReferrerHost(),
+      entry_path:location.pathname
+    });
+    sessionStorage.setItem(ATTRIBUTION_KEY,JSON.stringify(data));
+    return data;
+  }catch{return{}}
+}
+const attribution=readAttribution();
+
 export function trackEvent(eventName,metadata={},category='interaction'){
   const payload={
     client_id:clientId,
@@ -51,7 +75,7 @@ export function trackEvent(eventName,metadata={},category='interaction'){
     page_path:location.pathname+location.hash,
     app_host:location.host,
     display_mode:displayMode(),
-    metadata:cleanMeta(metadata)
+    metadata:{...attribution,...cleanMeta(metadata)}
   };
   try{
     fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),keepalive:true,credentials:'omit'}).catch(()=>{});
@@ -62,11 +86,10 @@ function labelOf(target){
   return {el,label:(el?.textContent||el?.getAttribute?.('aria-label')||'').replace(/\s+/g,' ').trim().toLowerCase()};
 }
 function classifyClick(target){
-  const{el,label}=labelOf(target);if(!el)return null;
+  const{el,label}=labelOf(target);if(!el||el.closest('[data-analytics-ignore="true"]'))return null;
   if(el.closest('.bottom-nav'))return['nav_section',{destination:(el.textContent||'').trim()}];
   if(el.matches('.bag-button,.training-basket')||/open basket/.test(label))return['basket_opened',basketSummary()];
-  if(/checkout/.test(label)&&/(online|shopify|pay)/.test(label))return['checkout_online_clicked',basketSummary()];
-  if(/whatsapp/.test(label)&&/(checkout|order)/.test(label))return['checkout_whatsapp_clicked',basketSummary()];
+  if(/repeat previous basket/.test(label))return['previous_basket_clicked',basketSummary()];
   if(/add selected/.test(label))return['shop_add_selected',basketSummary()];
   if(/add .*training fuel.*basket|add training fuel.*basket/.test(label))return['training_fuel_add_clicked',basketSummary()];
   if(/add .*race fuel.*basket|add race fuel.*basket/.test(label))return['race_fuel_add_clicked',basketSummary()];
