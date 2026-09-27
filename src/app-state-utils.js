@@ -11,6 +11,13 @@ export function normalizeTrainingTab(value){
   return TRAINING_TABS.includes(value)?value:'Overview';
 }
 
+export function resolveInitialMainSection({historyState,search='',returnSection=''}={}){
+  const params=new URLSearchParams(search||'');
+  if(params.has('strava'))return'Training';
+  if(returnSection==='Training')return'Training';
+  return normalizeMainSection(historyState?.jfSection);
+}
+
 export function readSavedItems(raw,ttlMs=basketTtlMs,now=Date.now()){
   if(!raw)return[];
   try{
