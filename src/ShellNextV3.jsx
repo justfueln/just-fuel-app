@@ -23,6 +23,7 @@ function loadBasket(){
 function loadLastBasket(){
   try{const raw=localStorage.getItem(LAST_BASKET_KEY);const items=readSavedItems(raw,LAST_BASKET_TTL);if(raw&&!items.length)localStorage.removeItem(LAST_BASKET_KEY);return items}catch{return[]}
 }
+function resetScroll(){window.scrollTo({top:0,left:0,behavior:'auto'})}
 
 export default function ShellNextV3(){
   const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search,pathname:window.location.pathname}));
@@ -60,18 +61,21 @@ export default function ShellNextV3(){
       jfProfile:false,
       jfBasket:false
     },'',window.location.href);
+    resetScroll();
   }
   function openTrainingView(value){
     const target=trainingTargetForView(value);
     setTrainingView(target.id);
     window.history.pushState({...window.history.state,jfSection:'training',jfTrainingTab:target.legacyTab,jfTrainingView:target.id,jfTrainingSubView:target.subView,jfProfile:false,jfBasket:false},'',window.location.href);
+    resetScroll();
   }
   function openHomeView(value){
     const next=value||'index';
     setHomeView(next);
     window.history.pushState({...window.history.state,jfSection:'home',jfHomeView:next,jfProfile:false,jfBasket:false},'',window.location.href);
+    resetScroll();
   }
-  function openProfile(){if(profileOpen)return;setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:section,jfProfile:true,jfBasket:false},'',window.location.href)}
+  function openProfile(){if(profileOpen)return;setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:section,jfProfile:true,jfBasket:false},'',window.location.href);resetScroll()}
   function closeProfile(){if(window.history.state?.jfProfile)window.history.back();else setProfileOpen(false)}
   function openBasket(){if(basketOpen)return;setProfileOpen(false);setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfHomeView:homeView,jfTrainingView:trainingView,jfFuelView:fuelView,jfProfile:false,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
@@ -93,6 +97,7 @@ export default function ShellNextV3(){
     const onPop=e=>{
       const next=normalizeMainSection(e.state?.jfSection||'home');
       setSectionState(next);setHomeView(e.state?.jfHomeView||'index');setTrainingView(trainingViewFromState(e.state||{}));setFuelView(normalizeFuelView(e.state?.jfFuelView));setProfileOpen(Boolean(e.state?.jfProfile));setBasketOpen(Boolean(e.state?.jfBasket));
+      if(!e.state?.jfBasket)requestAnimationFrame(resetScroll);
     };
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
@@ -141,7 +146,7 @@ export default function ShellNextV3(){
       </>}
     </div>
 
-    <nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id&&!profileOpen?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>
+    {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>}
     <CheckoutDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
   </div>
 }
