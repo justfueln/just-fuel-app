@@ -5,10 +5,11 @@ import { byKey } from './catalog';
 import { restockShortfalls, hydratePacks, restockBasketUnits } from './fuel-utils';
 import { fitFlavorSplit, moveFlavorUnit, evenFlavorSplit, flavorBasketLines } from './flavour-split';
 import { basketTtlMs, normalizeTrainingTab, readSavedItems } from './app-state-utils';
-import { fetchTrainingCore, fetchTrainingPlan, fetchTrainingRaces, fetchTrainingProfile, fetchTrainingFuelBase, fetchTrainingFuelForecast, sendTrainingOtp, verifyTrainingOtp, syncTrainingStrava, startTrainingStrava } from './training-api';
+import { fetchTrainingCore, fetchTrainingPlan, fetchTrainingRaces, fetchTrainingProfile, fetchTrainingFuelBase, fetchTrainingFuelForecast, fetchTrainingHistory, sendTrainingOtp, verifyTrainingOtp, syncTrainingStrava, startTrainingStrava } from './training-api';
 import RaceCalendar from './RaceCalendar';
+import TrainingHistory from './TrainingHistory';
 
-const TABS=['Overview','My Plan','My Race','Fuel','My Details'];
+const TABS=['Overview','My Plan','History','My Race','Fuel','My Details'];
 const DAY_OPTIONS=[[1,'Mon'],[2,'Tue'],[3,'Wed'],[3,'Wed'],[4,'Thu'],[5,'Fri'],[6,'Sat'],[7,'Sun']].filter((x,i,a)=>a.findIndex(y=>y[0]===x[0])===i);
 const SHARED_BASKET_KEY='just-fuel-basket-v3';
 const SHARED_BASKET_TTL=basketTtlMs;
@@ -29,12 +30,13 @@ function statusLabel(v){const map={completed:'Done',missed:'Missed',skipped:'Ski
 export default function AppV3(){
   const[session,setSession]=useState(null),[loading,setLoading]=useState(true),[syncLoading,setSyncLoading]=useState(false);
   const[tab,setTab]=useState(()=>normalizeTrainingTab(window.history.state?.jfTrainingTab));
-  const[setup,setSetup]=useState(null),[home,setHome]=useState(null),[profile,setProfile]=useState(null),[races,setRaces]=useState([]),[plan,setPlan]=useState([]),[fuel,setFuel]=useState([]),[stock,setStock]=useState([]),[fuelProfile,setFuelProfile]=useState(null);
+  const[setup,setSetup]=useState(null),[home,setHome]=useState(null),[profile,setProfile]=useState(null),[races,setRaces]=useState([]),[plan,setPlan]=useState([]),[history,setHistory]=useState([]),[fuel,setFuel]=useState([]),[stock,setStock]=useState([]),[fuelProfile,setFuelProfile]=useState(null);
   const[email,setEmail]=useState(''),[otp,setOtp]=useState(''),[otpSent,setOtpSent]=useState(false),[message,setMessage]=useState('');
   const[lastSync,setLastSync]=useState(()=>localStorage.getItem('jf-strava-last-sync')||'');
   const[fuelLoaded,setFuelLoaded]=useState(false);
   const[fuelTabLoading,setFuelTabLoading]=useState(false);
-  const[loaded,setLoaded]=useState({plan:false,races:false,profile:false,fuelBase:false});
+  const[historyLoading,setHistoryLoading]=useState(false);
+  const[loaded,setLoaded]=useState({plan:false,history:false,races:false,profile:false,fuelBase:false});
 
   useEffect(()=>{supabase.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false)});const{data:sub}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>sub.subscription.unsubscribe()},[]);
   useEffect(()=>{
@@ -42,14 +44,15 @@ export default function AppV3(){
     const onPop=e=>{if(e.state?.jfSection==='Training')setTab(normalizeTrainingTab(e.state?.jfTrainingTab))};
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
-  useEffect(()=>{if(session?.user){setLoaded({plan:false,races:false,profile:false,fuelBase:false});setFuelLoaded(false);setFuelTabLoading(false);loadCore()}},[session?.user?.id]);
+  useEffect(()=>{if(session?.user){setLoaded({plan:false,history:false,races:false,profile:false,fuelBase:false});setHistory([]);setFuelLoaded(false);setFuelTabLoading(false);setHistoryLoading(false);loadCore()}},[session?.user?.id]);
   useEffect(()=>{
     if(!session?.user)return;
     if(tab==='My Plan'&&!loaded.plan)loadPlan();
+    else if(tab==='History'&&!loaded.history&&!historyLoading)loadHistory();
     else if(tab==='My Race'&&!loaded.races)loadRaces();
     else if(tab==='My Details'&&!loaded.profile)loadProfile();
     else if(tab==='Fuel'&&!fuelTabLoading&&(!loaded.plan||!loaded.races||!loaded.fuelBase||!fuelLoaded))ensureFuelTab();
-  },[tab,session?.user?.id,loaded.plan,loaded.races,loaded.profile,loaded.fuelBase,fuelLoaded,fuelTabLoading]);
+  },[tab,session?.user?.id,loaded.plan,loaded.history,loaded.races,loaded.profile,loaded.fuelBase,fuelLoaded,fuelTabLoading,historyLoading]);
 
   function navigateTab(value){const next=normalizeTrainingTab(value);if(next===tab)return;setTab(next);window.history.pushState({...window.history.state,jfSection:'Training',jfTrainingTab:next,jfBasket:false},'',window.location.href)}
   async function loadCore({keepMessage=false}={}){
@@ -62,6 +65,12 @@ export default function AppV3(){
     if(!session?.user)return;const result=await fetchTrainingPlan(supabase,session.user.id);
     if(result.error){setMessage(keepMessage?`Could not load training plan: ${result.error.message}`:result.error.message);return}
     setPlan(result.plan);setLoaded(v=>({...v,plan:true}));
+  }
+  async function loadHistory(){
+    if(!session?.user||historyLoading)return;setHistoryLoading(true);
+    const result=await fetchTrainingHistory(supabase,session.user.id);
+    if(result.error)setMessage(`Could not load training history: ${result.error.message}`);else{setHistory(result.history);setLoaded(v=>({...v,history:true}))}
+    setHistoryLoading(false);
   }
   async function loadRaces(){
     if(!session?.user)return;const result=await fetchTrainingRaces(supabase,session.user.id);
@@ -87,15 +96,15 @@ export default function AppV3(){
     if(fuelTabLoading)return;setFuelTabLoading(true);
     try{const tasks=[];if(force||!loaded.plan)tasks.push(loadPlan());if(force||!loaded.races)tasks.push(loadRaces());if(force||!loaded.fuelBase)tasks.push(loadFuelBase());if(force||!fuelLoaded)tasks.push(loadFuelForecast());await Promise.all(tasks)}finally{setFuelTabLoading(false)}
   }
-  async function refreshCurrent(){setMessage('');await loadCore({keepMessage:true});if(tab==='My Plan')await loadPlan();else if(tab==='My Race')await loadRaces();else if(tab==='My Details')await loadProfile();else if(tab==='Fuel')await ensureFuelTab({force:true})}
+  async function refreshCurrent(){setMessage('');await loadCore({keepMessage:true});if(tab==='My Plan')await loadPlan();else if(tab==='History'){setLoaded(v=>({...v,history:false}));await loadHistory()}else if(tab==='My Race')await loadRaces();else if(tab==='My Details')await loadProfile();else if(tab==='Fuel')await ensureFuelTab({force:true})}
   async function reloadAfterRace(){setLoaded(v=>({...v,plan:false}));setFuelLoaded(false);await Promise.all([loadCore({keepMessage:true}),loadRaces()])}
   async function reloadDetails(){await Promise.all([loadCore({keepMessage:true}),loadProfile()])}
   async function reloadFuel(){await Promise.all([loadPlan(),loadFuelBase(),loadFuelForecast()])}
   async function sendOtp(){const clean=email.trim();if(!clean)return setMessage('Enter your email address first.');setMessage('Sending login code…');const{error}=await sendTrainingOtp(supabase,clean);if(error)return setMessage(error.message);setOtpSent(true);setMessage('Login code sent. Use the full code from the newest email.')}
   async function verifyOtp(){if(!otp.trim())return setMessage('Enter the login code from your email.');setMessage('Signing in…');const{error}=await verifyTrainingOtp(supabase,email.trim(),otp.trim());if(error)setMessage(error.message)}
-  async function syncStrava(){if(syncLoading)return;setSyncLoading(true);setMessage('Syncing Strava and adapting your plan…');const{data,error}=await syncTrainingStrava(supabase);if(error)setMessage(error.message);else{const note=data?.plan_adaptation?.changed_sessions?` ${data.plan_adaptation.changed_sessions} upcoming sessions checked/adjusted.`:'';const stamp=new Date().toISOString();localStorage.setItem('jf-strava-last-sync',stamp);setLastSync(stamp);setMessage(`Strava synced.${note}`);await loadCore({keepMessage:true});if(tab==='Fuel')await ensureFuelTab({force:true});else{setFuelLoaded(false);if(tab==='My Plan')await loadPlan();else setLoaded(v=>({...v,plan:false}))}}setSyncLoading(false)}
+  async function syncStrava(){if(syncLoading)return;setSyncLoading(true);setMessage('Syncing Strava and adapting your plan…');const{data,error}=await syncTrainingStrava(supabase);if(error)setMessage(error.message);else{const note=data?.plan_adaptation?.changed_sessions?` ${data.plan_adaptation.changed_sessions} upcoming sessions checked/adjusted.`:'';const stamp=new Date().toISOString();localStorage.setItem('jf-strava-last-sync',stamp);setLastSync(stamp);setMessage(`Strava synced.${note}`);await loadCore({keepMessage:true});setLoaded(v=>({...v,history:false}));if(tab==='Fuel')await ensureFuelTab({force:true});else if(tab==='History')await loadHistory();else{setFuelLoaded(false);if(tab==='My Plan')await loadPlan();else setLoaded(v=>({...v,plan:false}))}}setSyncLoading(false)}
   async function connectStrava(){setMessage('Opening Strava…');const{data,error}=await startTrainingStrava(supabase);if(error)return setMessage(error.message);if(data?.authorization_url)window.location.href=data.authorization_url;else setMessage('Could not start the Strava connection.')}
-  async function signOut(){await supabase.auth.signOut();setSession(null);setTab('Overview');setMessage('');setOtp('');setOtpSent(false);setLoaded({plan:false,races:false,profile:false,fuelBase:false});setFuelLoaded(false);setFuelTabLoading(false)}
+  async function signOut(){await supabase.auth.signOut();setSession(null);setTab('Overview');setMessage('');setOtp('');setOtpSent(false);setHistory([]);setLoaded({plan:false,history:false,races:false,profile:false,fuelBase:false});setFuelLoaded(false);setFuelTabLoading(false);setHistoryLoading(false)}
 
   if(loading)return<Splash/>;
   if(!session)return<Login email={email} setEmail={setEmail} otp={otp} setOtp={setOtp} sent={otpSent} send={sendOtp} verify={verifyOtp} message={message}/>;
@@ -106,6 +115,7 @@ export default function AppV3(){
     <main>{message&&<div className="notice">{message}</div>}
       {tab==='Overview'&&<Overview home={home} setup={setup} nextAction={nextAction} onConnect={connectStrava} onSync={syncStrava} syncLoading={syncLoading} lastSync={lastSync} go={navigateTab}/>} 
       {tab==='My Plan'&&<Plan plan={plan}/>} 
+      {tab==='History'&&<TrainingHistory activities={history} loading={historyLoading} onRefresh={loadHistory}/>} 
       {tab==='My Race'&&<SeasonRace races={races} userId={session.user.id} reload={reloadAfterRace}/>} 
       {tab==='Fuel'&&<FuelPage plan={plan} fuel={fuel} stock={stock} fuelProfile={fuelProfile} userId={session.user.id} races={races} reload={reloadFuel}/>} 
       {tab==='My Details'&&<Details profile={profile} userId={session.user.id} reload={reloadDetails}/>} 
@@ -132,7 +142,7 @@ function SeasonRace({races,userId,reload}){
   async function addSelected(){if(!selected)return;setLoading(true);setStatus('Adding event and rebuilding your season plan…');const{error}=await supabase.rpc('add_catalog_event_to_season',{p_event_id:selected.event_id,p_route_id:routeId||null,p_priority:priority,p_goal_time_minutes:goalTime?Number(goalTime):null});if(error){setStatus(error.message);setLoading(false);return}const built=await supabase.rpc('generate_season_training_plan');if(built.error)setStatus(`Event added, but season plan could not be rebuilt: ${built.error.message}`);else{setStatus('Event added. Your season plan has been rebuilt around your selected events.');setSelected(null);setRoutes([]);await reload({keepMessage:true})}setLoading(false)}
   async function removeRace(id){setLoading(true);await supabase.from('race_goals').update({status:'archived'}).eq('id',id).eq('user_id',userId);await supabase.rpc('generate_season_training_plan');await reload({keepMessage:true});setLoading(false)}
   async function changePriority(id,value){await supabase.from('race_goals').update({priority:value}).eq('id',id).eq('user_id',userId);await supabase.rpc('generate_season_training_plan');await reload({keepMessage:true})}
-  async function saveManual(){if(!manualForm.event_name||!manualForm.event_date)return setStatus('Add at least an event name and date.');setLoading(true);const payload={...manualForm,user_id:userId,status:'active',distance_km:manualForm.distance_km?Number(manualForm.distance_km):null,elevation_m:manualForm.elevation_m?Number(manualForm.elevation_m):null,goal_time_minutes:manualForm.goal_time_minutes?Number(manualForm.goal_time_minutes):null,auto_managed:false,selected_at:new Date().toISOString()};const{error}=await supabase.from('race_goals').insert(payload);if(error)setStatus(error.message);else{const built=await supabase.rpc('generate_season_training_plan');setStatus(built.error?`Event saved, but plan could not be built: ${built.error.message}`:'Event saved and season plan rebuilt.');setManual(false);setManualForm({event_name:'',event_date:'',sport_type:'cycling',event_type:'road_cycling',distance_km:'',elevation_m:'',goal_time_minutes:'',priority:'B'});await reload({keepMessage:true})}setLoading(false)}
+  async function saveManual(){if(!manualForm.event_name||!manualForm.event_date)return setStatus('Add at least an event name and date.');setLoading(true);const payload={...manualForm,user_id:userId,status:'active',distance_km:manualForm.distance_km?Number(manualForm.distance_km):null,elevation_m:manualForm.elevation_m?Number(manualForm.elevation_m):null,goal_time_minutes:manualForm.goal_time_minutes?Number(manualForm.goal_time_minutes):null,priority:manualForm.priority||'B',auto_managed:false,selected_at:new Date().toISOString()};const{error}=await supabase.from('race_goals').insert(payload);if(error)setStatus(error.message);else{const built=await supabase.rpc('generate_season_training_plan');setStatus(built.error?`Event saved, but plan could not be built: ${built.error.message}`:'Event saved and season plan rebuilt.');setManual(false);setManualForm({event_name:'',event_date:'',sport_type:'cycling',event_type:'road_cycling',distance_km:'',elevation_m:'',goal_time_minutes:'',priority:'B'});await reload({keepMessage:true})}setLoading(false)}
   const selectedRoutes=routes.length?routes:(selected?.routes||[]);
   return<div className="stack season-screen">
     <section className="card season-summary"><div className="row-between"><div><span className="eyebrow">MY SEASON</span><h2>{races.length?`${races.length} upcoming event${races.length===1?'':'s'}`:'Build your season'}</h2></div><Target size={25}/></div><p className="muted">Choose multiple events. A races drive the main training block; B and C events are fitted into the plan without creating overlapping programmes.</p>{races.length>0&&<div className="season-event-list">{races.map(r=><div className="season-event" key={r.race_goal_id}><div><div className="season-date">{fmtDate(r.event_date)}</div><strong>{r.event_name}</strong><div className="season-meta">{sportLabel(r.event_type||r.sport_type)}{r.distance_km?` · ${r.distance_km} km`:''}{r.elevation_m?` · ${Math.round(r.elevation_m)} m`:''}{r.difficulty_label?` · ${r.difficulty_label}`:''}</div></div><div className="season-actions"><select value={r.priority||'B'} onChange={e=>changePriority(r.race_goal_id,e.target.value)}><option value="A">A</option><option value="B">B</option><option value="C">C</option></select><button className="icon-btn mini" onClick={()=>removeRace(r.race_goal_id)} aria-label="Remove event"><X size={16}/></button></div></div>)}</div>}</section>
