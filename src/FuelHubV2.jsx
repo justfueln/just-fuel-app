@@ -22,8 +22,8 @@ const PRODUCT_ROWS=[
   ['recover','Recover','servings']
 ];
 
-export default function FuelHubV2({addLine,openBasket}){
-  const[view,setView]=useState(()=>normalizeFuelView(window.history.state?.jfFuelView));
+export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewChange}){
+  const[view,setView]=useState(()=>normalizeFuelView(viewTarget||window.history.state?.jfFuelView));
   const[session,setSession]=useState(null);
   const[loading,setLoading]=useState(true);
   const[message,setMessage]=useState('');
@@ -32,13 +32,12 @@ export default function FuelHubV2({addLine,openBasket}){
   const[stock,setStock]=useState([]);
   const[fuelProfile,setFuelProfile]=useState(null);
 
+  useEffect(()=>setView(normalizeFuelView(viewTarget)),[viewTarget]);
   useEffect(()=>{
     let mounted=true;
     supabase.auth.getSession().then(({data})=>{if(!mounted)return;setSession(data.session);if(data.session?.user)loadAll(data.session.user.id);else setLoading(false)});
     const{data:sub}=supabase.auth.onAuthStateChange((_event,next)=>{setSession(next);if(next?.user)loadAll(next.user.id);else{setPlan([]);setForecast([]);setStock([]);setFuelProfile(null);setLoading(false)}});
-    const pop=e=>setView(normalizeFuelView(e.state?.jfFuelView));
-    window.addEventListener('popstate',pop);
-    return()=>{mounted=false;sub.subscription.unsubscribe();window.removeEventListener('popstate',pop)};
+    return()=>{mounted=false;sub.subscription.unsubscribe()};
   },[]);
 
   async function loadAll(userId=session?.user?.id){
@@ -55,7 +54,7 @@ export default function FuelHubV2({addLine,openBasket}){
 
   function go(next){
     const id=normalizeFuelView(next);
-    setView(id);
+    setView(id);onViewChange?.(id);
     window.history.pushState({...window.history.state,jfSection:'fuel',jfFuelView:id,jfBasket:false},'',window.location.href);
     window.scrollTo({top:0,behavior:'smooth'});
   }
