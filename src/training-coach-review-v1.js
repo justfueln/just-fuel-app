@@ -65,7 +65,10 @@ function coachText(row,feedback,fuel){
 async function markRecover(row,fuel){
   const{data:{session}}=await sb.auth.getSession();if(!session?.user)throw new Error('Please sign in again.');
   const base=fuel||{};const payload={user_id:session.user.id,session_id:row.id,activity_id:base.activity_id||row.actual_activity_id||null,bottle_mix_sachets:Number(base.bottle_mix_sachets)||0,regular_gels:Number(base.regular_gels)||0,boost_gels:Number(base.boost_gels)||0,hydrate_servings:Number(base.hydrate_servings)||0,recover_servings:Math.max(1,Number(base.recover_servings)||0),extra_carbs_g:Number(base.extra_carbs_g)||0,fluid_ml:Number(base.fluid_ml)||0,energy_feel:base.energy_feel||null,issues:base.issues||[],notes:base.notes||null};
-  const{error}=await sb.from('training_session_fuel_actual').upsert(payload,{onConflict:'session_id'});if(error)throw error;fuelMap.set(row.id,payload);cacheAt=Date.now();window.dispatchEvent(new CustomEvent('jf-recovery-logged',{detail:{sessionId:row.id}}));
+  const{error}=await sb.from('training_session_fuel_actual').upsert(payload,{onConflict:'session_id'});if(error)throw error;fuelMap.set(row.id,payload);cacheAt=Date.now();
+  let decision=null;try{const result=await sb.rpc('refresh_next_training_coach_decision',{p_user_id:session.user.id});decision=result.data||null}catch{}
+  window.dispatchEvent(new CustomEvent('jf-recovery-logged',{detail:{sessionId:row.id,decision}}));
+  window.dispatchEvent(new CustomEvent('jf-training-plan-updated',{detail:{source:'recovery',decision}}));
 }
 
 function renderCoach(card,row,feedback,fuel){
