@@ -36,17 +36,48 @@ export const supabase = createClient(
   { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
 );
 
-// Deliberately no service-worker registration here.
-// Older Just Fuel builds cached entire application shells, which allowed a
-// retired UI to reappear. The boot loader in index.html now purges those
-// registrations/caches before React starts. The current app is network-first
-// from the active deployment only.
+async function purgeLegacyPwa(){
+  try{
+    const marker='jf-current-app-clean-v11';
+    if(sessionStorage.getItem(marker)==='1') return false;
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <NetworkStatus />
-      <ShellNextV3 />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+    let registrations=[];
+    if('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations){
+      registrations=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(reg=>reg.unregister().catch(()=>false)));
+    }
+
+    let cacheNames=[];
+    if('caches' in window && caches.keys){
+      cacheNames=await caches.keys();
+      await Promise.all(cacheNames.map(name=>caches.delete(name).catch(()=>false)));
+    }
+
+    sessionStorage.setItem(marker,'1');
+    return registrations.length>0 || cacheNames.length>0 || Boolean(navigator.serviceWorker?.controller);
+  }catch(error){
+    console.warn('Legacy Just Fuel PWA cleanup failed:',error);
+    return false;
+  }
+}
+
+async function boot(){
+  const cleaned=await purgeLegacyPwa();
+  if(cleaned){
+    const url=new URL(window.location.href);
+    url.searchParams.set('jfapp','11');
+    window.location.replace(`${url.pathname}${url.search}${url.hash}`);
+    return;
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <ErrorBoundary>
+        <NetworkStatus />
+        <ShellNextV3 />
+      </ErrorBoundary>
+    </React.StrictMode>
+  );
+}
+
+boot();
