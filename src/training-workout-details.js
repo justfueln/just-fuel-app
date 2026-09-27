@@ -69,6 +69,7 @@ function renderDetails(body,data,sessionRow){
   });
   body.append(list);
   const fuel=fuelLine(sessionRow);if(fuel){const f=el('div','workout-fuel-line');f.append(el('span','','FUEL'),el('strong','',fuel));body.append(f)}
+  if(Number(sessionRow.recover_servings)>0){const recovery=el('div','workout-recovery-line');recovery.append(el('span','','RECOVER'),el('strong','',`${sessionRow.recover_servings} × Just Fuel Recover after training`));if(sessionRow.recovery_note)recovery.append(el('small','',sessionRow.recovery_note));body.append(recovery)}
   if(data.downloadable!==false)renderGarminSync(body,data);
 }
 function addEnhancement(card,row){
@@ -84,6 +85,7 @@ async function scan(force=false){
 function queueScan(){if(scanQueued)return;scanQueued=true;setTimeout(()=>{scanQueued=false;scan().catch(()=>{})},120)}
 if(typeof window!=='undefined'){
   window.addEventListener('load',queueScan);
+  window.addEventListener('jf-training-plan-updated',()=>{cache=[];cacheAt=0;loadingSessions=null;document.querySelectorAll('.training-page .session-card').forEach(card=>{delete card.dataset.jfWorkoutEnhanced;delete card.dataset.jfSessionId;card.querySelector('.workout-details-wrap')?.remove()});queueScan()});
   const obs=new MutationObserver(muts=>{if(muts.some(m=>m.addedNodes.length||m.removedNodes.length))queueScan()});
   const start=()=>{if(document.body)obs.observe(document.body,{childList:true,subtree:true});queueScan()};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
