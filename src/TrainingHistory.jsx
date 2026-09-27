@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Activity, Bike, Footprints, HeartPulse, Mountain, RefreshCw, Timer, Zap } from 'lucide-react';
 import TrainingPerformance from './TrainingPerformance';
+import TrainingPlanCompare from './TrainingPlanCompare';
 
 function formatDateTime(value){
   if(!value)return'—';
@@ -35,9 +36,9 @@ export default function TrainingHistory({activities=[],loading=false,onRefresh})
   }),{count:0,seconds:0,distance:0,elevation:0}),[activities]);
 
   return <div className="stack training-history-screen">
-    <div className="segmented training-history-view"><button className={view==='History'?'active':''} onClick={()=>setView('History')}>History</button><button className={view==='Performance'?'active':''} onClick={()=>setView('Performance')}>Performance</button></div>
+    <div className="segmented training-history-view"><button className={view==='History'?'active':''} onClick={()=>setView('History')}>History</button><button className={view==='Performance'?'active':''} onClick={()=>setView('Performance')}>Performance</button><button className={view==='Compare'?'active':''} onClick={()=>setView('Compare')}>Plan vs Actual</button></div>
 
-    {view==='Performance'?<TrainingPerformance activities={activities} loading={loading} onRefresh={onRefresh}/>:<>
+    {view==='Performance'?<TrainingPerformance activities={activities} loading={loading} onRefresh={onRefresh}/>:view==='Compare'?<TrainingPlanCompare/>:<>
       <section className="card">
         <div className="row-between"><div><span className="eyebrow">TRAINING HISTORY</span><h2>{summary.count} downloaded activit{summary.count===1?'y':'ies'}</h2></div><button className="icon-btn" onClick={onRefresh} disabled={loading} aria-label="Refresh training history"><RefreshCw size={18}/></button></div>
         <p className="muted">Everything currently downloaded from Strava, newest first.</p>
