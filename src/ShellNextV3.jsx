@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, BookOpen, Calculator, MoreHorizontal, ShoppingBag, Store, Truck } from 'lucide-react';
+import { Activity, BookOpen, Calculator, MoreHorizontal, ShoppingBag, Store } from 'lucide-react';
 import TrainingApp from './App';
 import CheckoutDrawer from './CheckoutDrawer';
 import MorePage, { ReminderBanner } from './MorePage';
@@ -100,8 +100,8 @@ export default function ShellNextV3(){
     if(!installPrompt) return; await installPrompt.prompt(); try{await installPrompt.userChoice}catch{} setInstallPrompt(null);
   }
 
-  return <div className={`full-shell jf-next jf-v3 ${section==='Training'?'training-page':'light-page'}`}>
-    {section!=='Training'&&<AppHeader count={basketCount} onBasket={openBasket}/>} 
+  return <div className={`full-shell jf-next jf-v3 current-shell ${section==='Training'?'training-page':'current-page'}`}>
+    {section!=='Training'&&<CurrentAppHeader count={basketCount} onBasket={openBasket}/>} 
     {section==='Training'&&<button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button>}
     {reminderDue&&section!=='Training'&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('Plan');dismissReminder()}} onDismiss={dismissReminder}/>} 
 
@@ -118,6 +118,6 @@ export default function ShellNextV3(){
   </div>
 }
 
-function AppHeader({count,onBasket}){
-  return <><div className="delivery-banner"><Truck size={18}/>PUDO delivery: R75 · Free over R600</div><header className="shell-header"><div className="jf-logo"><div><b>JUST</b><strong>FUEL</strong></div><small>ENDURANCE NUTRITION</small></div><button className="bag-button" onClick={onBasket} aria-label="Open basket"><ShoppingBag size={25}/><span className="bag-count">{count}</span></button></header></>
+function CurrentAppHeader({count,onBasket}){
+  return <header className="current-app-header"><div><div className="current-brand">JUST FUEL</div><div className="current-subbrand">FUEL SMART • TRAIN HARD</div></div><button className="current-bag-button" onClick={onBasket} aria-label="Open basket"><ShoppingBag size={24}/>{count>0&&<span>{count}</span>}</button></header>
 }
