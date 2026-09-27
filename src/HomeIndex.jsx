@@ -15,7 +15,7 @@ export default function HomeIndex({goRoute,openHomeView}){
     <section className="home-index-primary">
       {HOME_INDEX_ITEMS.slice(0,4).map(item=>{
         const Icon=ICONS[item.id];
-        return <button key={item.id} className="home-index-card" onClick={()=>goRoute(item.route)}>
+        return <button key={item.id} className="home-index-card" onClick={()=>goRoute(item.route,{fuelView:item.fuelView})}>
           <span className="home-index-icon"><Icon size={22}/></span>
           <span className="home-index-copy"><strong>{item.title}</strong><small>{item.copy}</small></span>
           <ChevronRight size={20}/>
@@ -27,7 +27,8 @@ export default function HomeIndex({goRoute,openHomeView}){
       <span className="home-index-section-label">TOOLS & SETTINGS</span>
       {HOME_INDEX_ITEMS.slice(4).map(item=>{
         const Icon=ICONS[item.id];
-        return <button key={item.id} className="home-index-tool" onClick={()=>openHomeView(item.homeView)}>
+        const action=item.route?()=>goRoute(item.route,{fuelView:item.fuelView}):()=>openHomeView(item.homeView);
+        return <button key={item.id} className="home-index-tool" onClick={action}>
           <span><Icon size={19}/></span>
           <div><strong>{item.title}</strong><small>{item.copy}</small></div>
           <ChevronRight size={18}/>
