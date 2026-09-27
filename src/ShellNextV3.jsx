@@ -1,15 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, BookOpen, Calculator, MoreHorizontal, ShoppingBag, Store } from 'lucide-react';
+import { Activity, ArrowLeft, Flag, Fuel, Home, ShoppingBag, Store } from 'lucide-react';
 import TrainingApp from './App';
 import CheckoutDrawer from './CheckoutDrawer';
 import MorePage, { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
 import { FuelBuilder, ShopPage, LearnPage } from './CommercePages';
+import HomeIndex from './HomeIndex';
+import { APP_ROUTES, BOTTOM_NAV, trainingTabForRoute } from './navigation-registry';
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
 
-const NAV = [
-  ['Plan', Calculator], ['Learn', BookOpen], ['Shop', Store], ['Training', Activity], ['More', MoreHorizontal]
-];
+const NAV_ICONS={home:Home,training:Activity,race:Flag,fuel:Fuel,shop:Store};
 const BASKET_KEY = 'just-fuel-basket-v3';
 const LAST_BASKET_KEY = 'just-fuel-last-basket-v1';
 const BASKET_TTL = basketTtlMs;
@@ -24,6 +24,7 @@ function loadLastBasket(){
 
 export default function ShellNextV3(){
   const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search,pathname:window.location.pathname}));
+  const [homeView,setHomeView]=useState(()=>window.history.state?.jfHomeView||'index');
   const [basket,setBasket]=useState(loadBasket);
   const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
@@ -31,9 +32,23 @@ export default function ShellNextV3(){
   const [installPrompt,setInstallPrompt]=useState(null);
   const [installed,setInstalled]=useState(false);
 
+  const isTrainingArea=['training','race','fuel'].includes(section);
+
   function applySection(value){const next=normalizeMainSection(value);setSectionState(next);return next}
-  function setSection(value){const next=normalizeMainSection(value);if(next===section)return;setBasketOpen(false);applySection(next);window.history.pushState({...window.history.state,jfSection:next,jfBasket:false},'',window.location.href)}
-  function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfBasket:true},'',window.location.href)}
+  function setSection(value){
+    const next=normalizeMainSection(value);
+    const targetTab=trainingTabForRoute(next);
+    setBasketOpen(false);
+    if(next==='home')setHomeView('index');
+    applySection(next);
+    window.history.pushState({...window.history.state,jfSection:next,jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,jfHomeView:next==='home'?'index':window.history.state?.jfHomeView,jfBasket:false},'',window.location.href);
+  }
+  function openHomeView(value){
+    const next=value||'index';
+    setHomeView(next);
+    window.history.pushState({...window.history.state,jfSection:'home',jfHomeView:next,jfBasket:false},'',window.location.href);
+  }
+  function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfHomeView:homeView,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
   function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
@@ -48,8 +63,14 @@ export default function ShellNextV3(){
       url.searchParams.delete('jfcb');
     }
     const nextUrl=stravaReturn?`${url.pathname}${url.search}${url.hash}`:window.location.href;
-    window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:section==='Training'?'Overview':window.history.state?.jfTrainingTab,jfBasket:false},'',nextUrl);
-    const onPop=e=>{const next=normalizeMainSection(e.state?.jfSection||'Plan');setSectionState(next);setBasketOpen(Boolean(e.state?.jfBasket))};
+    const targetTab=trainingTabForRoute(section);
+    window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,jfHomeView:section==='home'?(window.history.state?.jfHomeView||homeView):window.history.state?.jfHomeView,jfBasket:false},'',nextUrl);
+    const onPop=e=>{
+      const next=normalizeMainSection(e.state?.jfSection||'home');
+      setSectionState(next);
+      setHomeView(e.state?.jfHomeView||'index');
+      setBasketOpen(Boolean(e.state?.jfBasket));
+    };
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
 
@@ -69,7 +90,7 @@ export default function ShellNextV3(){
     window.addEventListener('jf-basket-updated',syncBasket);
     window.addEventListener('jf-open-basket',open);
     return ()=>{window.removeEventListener('jf-basket-updated',syncBasket);window.removeEventListener('jf-open-basket',open)};
-  },[section,basketOpen]);
+  },[section,basketOpen,homeView]);
 
   useEffect(()=>{
     const standalone=window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;
@@ -100,24 +121,30 @@ export default function ShellNextV3(){
     if(!installPrompt) return; await installPrompt.prompt(); try{await installPrompt.userChoice}catch{} setInstallPrompt(null);
   }
 
-  return <div className={`full-shell jf-next jf-v3 current-shell ${section==='Training'?'training-page':'current-page'}`}>
-    {section!=='Training'&&<CurrentAppHeader count={basketCount} onBasket={openBasket}/>} 
-    {section==='Training'&&<button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button>}
-    {reminderDue&&section!=='Training'&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('Plan');dismissReminder()}} onDismiss={dismissReminder}/>} 
+  return <div className={`full-shell jf-next jf-v3 current-shell ${isTrainingArea?'training-page':'current-page'}`}>
+    {!isTrainingArea&&<CurrentAppHeader count={basketCount} onBasket={openBasket}/>} 
+    {isTrainingArea&&<button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button>}
+    {reminderDue&&!isTrainingArea&&<ReminderBanner reminder={reminder} onPlan={()=>{if(section!=='home')applySection('home');openHomeView('plan');dismissReminder()}} onDismiss={dismissReminder}/>} 
 
     <div className="shell-content">
-      {section==='Plan'&&<FuelBuilder addLine={addLine} openBasket={openBasket}/>} 
-      {section==='Learn'&&<LearnPage/>}
-      {section==='Shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
-      {section==='Training'&&<TrainingApp/>}
-      {section==='More'&&<MorePage reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>} 
+      {section==='home'&&homeView==='index'&&<HomeIndex goRoute={setSection} openHomeView={openHomeView}/>} 
+      {section==='home'&&homeView!=='index'&&<HomeSubpageHead title={homeView==='plan'?'Quick Fuel Planner':homeView==='learn'?'Learn':'Settings & Reminders'} onBack={()=>window.history.back()}/>} 
+      {section==='home'&&homeView==='plan'&&<FuelBuilder addLine={addLine} openBasket={openBasket}/>} 
+      {section==='home'&&homeView==='learn'&&<LearnPage/>}
+      {section==='home'&&homeView==='settings'&&<MorePage reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>} 
+      {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
+      {isTrainingArea&&<TrainingApp key={section}/>} 
     </div>
 
-    <nav className="bottom-nav" aria-label="Main navigation">{NAV.map(([label,Icon])=><button key={label} className={section===label?'active':''} onClick={()=>setSection(label)}><Icon size={25}/><span>{label}</span></button>)}</nav>
+    <nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>
     <CheckoutDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
   </div>
 }
 
 function CurrentAppHeader({count,onBasket}){
   return <header className="current-app-header"><div><div className="current-brand">JUST FUEL</div><div className="current-subbrand">FUEL SMART • TRAIN HARD</div></div><button className="current-bag-button" onClick={onBasket} aria-label="Open basket"><ShoppingBag size={24}/>{count>0&&<span>{count}</span>}</button></header>
+}
+
+function HomeSubpageHead({title,onBack}){
+  return <div className="home-subpage-head"><button onClick={onBack} aria-label="Back to Home"><ArrowLeft size={20}/></button><div><span>HOME</span><strong>{title}</strong></div></div>;
 }
