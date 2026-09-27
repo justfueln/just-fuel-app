@@ -1,0 +1,37 @@
+name: Apply Training simplification
+
+on:
+  push:
+    branches:
+      - current-pwa-migration
+    paths:
+      - '.github/workflows/apply-training-simplification.yml'
+      - 'scripts/apply-training-simplification.mjs'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out preview branch
+        uses: actions/checkout@v4
+        with:
+          ref: current-pwa-migration
+          fetch-depth: 0
+
+      - name: Apply Training simplification
+        run: node scripts/apply-training-simplification.mjs
+
+      - name: Commit generated source change
+        run: |
+          if git diff --quiet -- src/AppV3.jsx; then
+            echo "No source change required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/AppV3.jsx
+          git commit -m "Simplify Training navigation [skip ci]"
+          git push origin current-pwa-migration
