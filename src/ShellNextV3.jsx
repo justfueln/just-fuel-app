@@ -23,7 +23,7 @@ function loadLastBasket(){
 }
 
 export default function ShellNextV3(){
-  const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search}));
+  const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search,pathname:window.location.pathname}));
   const [basket,setBasket]=useState(loadBasket);
   const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
@@ -40,10 +40,12 @@ export default function ShellNextV3(){
 
   useEffect(()=>{
     const url=new URL(window.location.href);
-    const stravaReturn=url.searchParams.has('strava');
+    const stravaReturn=url.pathname==='/strava-return'||url.searchParams.has('strava');
     if(stravaReturn){
+      url.pathname='/';
       url.searchParams.delete('strava');
       url.searchParams.delete('detail');
+      url.searchParams.delete('jfcb');
     }
     const nextUrl=stravaReturn?`${url.pathname}${url.search}${url.hash}`:window.location.href;
     window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:section==='Training'?'Overview':window.history.state?.jfTrainingTab,jfBasket:false},'',nextUrl);
