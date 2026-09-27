@@ -7,21 +7,6 @@ let cache=[],cacheAt=0,scanQueued=false,loadingSessions=null;
 
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
 function niceDuration(seconds){const s=Math.max(0,Number(seconds)||0);if(s<60)return`${s}s`;const m=Math.round(s/60);return`${m} min`}
-function isAndroid(){return /Android/i.test(navigator.userAgent||'')}
-function crc32(bytes){let crc=0xffffffff;for(let i=0;i<bytes.length;i++){crc^=bytes[i];for(let j=0;j<8;j++)crc=(crc>>>1)^((crc&1)?0xedb88320:0)}return(crc^0xffffffff)>>>0}
-function u16(n){return[n&255,(n>>>8)&255]}
-function u32(n){return[n&255,(n>>>8)&255,(n>>>16)&255,(n>>>24)&255]}
-function zipSingleFile(filename,bytes){
-  const enc=new TextEncoder(),name=enc.encode(filename),crc=crc32(bytes),size=bytes.length;
-  const local=new Uint8Array(30+name.length+size);let p=0;
-  [0x50,0x4b,0x03,0x04,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(size),...u32(size),...u16(name.length),0,0].forEach(v=>local[p++]=v);
-  local.set(name,p);p+=name.length;local.set(bytes,p);
-  const central=new Uint8Array(46+name.length);p=0;
-  [0x50,0x4b,0x01,0x02,20,0,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(size),...u32(size),...u16(name.length),0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0].forEach(v=>central[p++]=v);
-  central.set(name,p);
-  const end=new Uint8Array([0x50,0x4b,0x05,0x06,0,0,0,0,1,0,1,0,...u32(central.length),...u32(local.length),0,0]);
-  return new Blob([local,central,end],{type:'application/zip'});
-}
 async function sessions(force=false){
   if(!force&&cache.length&&Date.now()-cacheAt<60000)return cache;
   if(loadingSessions)return loadingSessions;
@@ -45,16 +30,30 @@ async function callWorkout(sessionId,format='json'){
 }
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n}
 function fuelLine(s){const bits=[];if(Number(s.carb_target_gph)>0)bits.push(`${s.carb_target_gph} g carbs/h`);if(Number(s.bottle_mix_sachets)>0)bits.push(`${s.bottle_mix_sachets} Bottle Mix`);if(Number(s.regular_gels)>0)bits.push(`${s.regular_gels} gel${Number(s.regular_gels)===1?'':'s'}`);if(Number(s.boost_gels)>0)bits.push(`${s.boost_gels} Boost`);return bits.join(' · ')}
-function renderGarminGuide(body){
+function downloadFitBlob(blob,filename){
+  const a=document.createElement('a');a.href=window.URL.createObjectURL(blob);a.download=filename;a.style.display='none';document.body.append(a);a.click();
+  setTimeout(()=>{window.URL.revokeObjectURL(a.href);a.remove()},2500);
+}
+async function downloadManualFit(data,btn,result){
+  if(btn.disabled)return;btn.disabled=true;const old=btn.textContent;btn.textContent='Creating .FIT file…';result.hidden=true;
+  try{
+    const r=await callWorkout(data.session_id,'fit');const blob=await r.blob();const cd=r.headers.get('content-disposition')||'';const match=cd.match(/filename=\"?([^\";]+)\"?/i);const filename=match?.[1]||'just-fuel-workout.fit';
+    downloadFitBlob(blob,filename);btn.textContent='.FIT downloaded';result.textContent='Manual FIT downloaded. This fallback is intended for computer/USB transfer only.';result.hidden=false;
+    setTimeout(()=>{btn.textContent=old},3000);
+  }catch(e){btn.textContent=e?.message||'Download failed';result.textContent='The workout could not be downloaded. Please try again.';result.hidden=false;setTimeout(()=>btn.textContent=old,2800)}finally{btn.disabled=false}
+}
+function renderGarminSync(body,data){
   const guide=el('div','workout-garmin-guide');
-  guide.append(el('strong','',isAndroid()?'Android: Garmin Connect cannot import workout FIT files directly':'Workout only — no route required'));
-  guide.append(el('p','',isAndroid()?'The ZIP prevents Garmin Connect from hijacking the FIT as a Course. Extract it, then copy the FIT file to Garmin/NewFiles. Do not open the FIT with Garmin Connect.':'This file contains workout steps only. Ride it on any route. Copy the FIT to Garmin/NewFiles; do not import it as a Course.'));
+  guide.append(el('strong','','Garmin sync'));
+  guide.append(el('p','','One-tap Send to Garmin is being connected through the Garmin Training API. No ZIP, extracting or course import will be required.'));
+  const send=el('button','workout-fit-button');send.type='button';send.disabled=true;send.textContent='Send to Garmin — coming soon';guide.append(send);
   const details=document.createElement('details');details.className='workout-garmin-howto';
-  const summary=document.createElement('summary');summary.textContent='How to load it on Garmin';details.append(summary);
-  const steps=document.createElement('ol');
-  const list=isAndroid()?['Download the ZIP from Just Fuel.','Extract the ZIP in My Files / Files.','Connect the Garmin device by USB to your phone or computer.','Copy the extracted .FIT file into Garmin/NewFiles.','Disconnect the Garmin. The session will appear under Workouts and can be ridden on any route.']:['Download the .FIT workout here.','Connect your Garmin device to a computer with USB.','Open the Garmin folder and copy the file into Garmin/NewFiles.','Safely disconnect and power on the Garmin. The session will be available under Workouts — no course or route is attached.'];
-  list.forEach(x=>{const li=document.createElement('li');li.textContent=x;steps.append(li)});
-  details.append(steps);guide.append(details);body.append(guide);
+  const summary=document.createElement('summary');summary.textContent='Manual FIT download';
+  const note=el('p','','Advanced fallback only: download the structured .FIT for computer/USB transfer. Garmin Connect mobile may treat manually opened FIT files as Courses.');
+  const btn=el('button','workout-fit-button');btn.type='button';btn.textContent='Download .FIT manually';
+  const result=el('div','workout-fit-result');result.hidden=true;
+  btn.addEventListener('click',()=>downloadManualFit(data,btn,result));
+  details.append(summary,note,btn,result);guide.append(details);body.append(guide);
 }
 function renderDetails(body,data,sessionRow){
   body.replaceChildren();
@@ -70,30 +69,12 @@ function renderDetails(body,data,sessionRow){
   });
   body.append(list);
   const fuel=fuelLine(sessionRow);if(fuel){const f=el('div','workout-fuel-line');f.append(el('span','','FUEL'),el('strong','',fuel));body.append(f)}
-  if(data.downloadable!==false){
-    const android=isAndroid();
-    const btn=el('button','workout-fit-button');btn.type='button';btn.textContent=android?'Download Garmin workout ZIP':'Download workout .FIT';
-    const result=el('div','workout-fit-result');result.hidden=true;
-    btn.addEventListener('click',async()=>{
-      if(btn.disabled)return;btn.disabled=true;const old=btn.textContent;btn.textContent='Creating workout file…';result.hidden=true;
-      try{
-        const r=await callWorkout(data.session_id,'fit');const fitBlob=await r.blob();const cd=r.headers.get('content-disposition')||'';const match=cd.match(/filename="?([^";]+)"?/i);const fitName=match?.[1]||'just-fuel-workout.fit';
-        let blob=fitBlob,downloadName=fitName;
-        if(android){blob=zipSingleFile(fitName,new Uint8Array(await fitBlob.arrayBuffer()));downloadName=fitName.replace(/\.fit$/i,'')+'-garmin-workout.zip'}
-        const a=document.createElement('a');a.href=window.URL.createObjectURL(blob);a.download=downloadName;a.style.display='none';document.body.append(a);a.click();
-        setTimeout(()=>{window.URL.revokeObjectURL(a.href);a.remove()},2500);
-        btn.textContent=android?'Garmin workout ZIP downloaded':'Workout .FIT downloaded';
-        result.textContent=android?'ZIP downloaded. Extract it and copy the .FIT file to Garmin/NewFiles. Do not open the FIT with Garmin Connect — that launches Course Setup.':'Workout FIT downloaded. Copy it to Garmin/NewFiles. Do not import it through Garmin Connect Courses.';result.hidden=false;
-        setTimeout(()=>{btn.textContent=old},3000);
-      }catch(e){btn.textContent=e?.message||'Download failed';result.textContent='The workout could not be downloaded. Please try again.';result.hidden=false;setTimeout(()=>btn.textContent=old,2800)}finally{btn.disabled=false}
-    });
-    body.append(btn,result);renderGarminGuide(body);
-  }
+  if(data.downloadable!==false)renderGarminSync(body,data);
 }
 function addEnhancement(card,row){
   if(card.dataset.jfWorkoutEnhanced==='1')return;card.dataset.jfWorkoutEnhanced='1';card.dataset.jfSessionId=row.id;
-  const wrap=el('div','workout-details-wrap');const toggle=el('button','workout-details-toggle');toggle.type='button';toggle.setAttribute('aria-expanded','false');toggle.textContent='Workout details + Garmin FIT';const body=el('div','workout-details-body');body.hidden=true;wrap.append(toggle,body);card.append(wrap);
-  toggle.addEventListener('click',async()=>{const opening=body.hidden;body.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));toggle.textContent=opening?'Hide workout details':'Workout details + Garmin FIT';if(!opening||body.dataset.loaded==='1')return;body.replaceChildren(el('div','workout-loading','Building your workout breakdown…'));try{const data=await callWorkout(row.id,'json');renderDetails(body,data,row);body.dataset.loaded='1'}catch(e){body.replaceChildren(el('div','workout-error',e?.message||'Could not load workout details.'))}});
+  const wrap=el('div','workout-details-wrap');const toggle=el('button','workout-details-toggle');toggle.type='button';toggle.setAttribute('aria-expanded','false');toggle.textContent='Workout details + Garmin';const body=el('div','workout-details-body');body.hidden=true;wrap.append(toggle,body);card.append(wrap);
+  toggle.addEventListener('click',async()=>{const opening=body.hidden;body.hidden=!opening;toggle.setAttribute('aria-expanded',String(opening));toggle.textContent=opening?'Hide workout details':'Workout details + Garmin';if(!opening||body.dataset.loaded==='1')return;body.replaceChildren(el('div','workout-loading','Building your workout breakdown…'));try{const data=await callWorkout(row.id,'json');renderDetails(body,data,row);body.dataset.loaded='1'}catch(e){body.replaceChildren(el('div','workout-error',e?.message||'Could not load workout details.'))}});
 }
 async function scan(force=false){
   const cards=[...document.querySelectorAll('.training-page .session-card')];if(!cards.length)return;let rows=await sessions(force);const used=new Set();let unmatched=false;
