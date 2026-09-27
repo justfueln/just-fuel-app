@@ -27,8 +27,6 @@ export const RACE_NAV=[
   {id:'checklist',label:'Checklist'}
 ];
 
-// Phase 4 Fuel pages. Race fueling remains inside the selected Race so the
-// athlete never has to guess whether a race plan belongs under Race or Fuel.
 export const FUEL_NAV=[
   {id:'home',label:'Fuel Home',copy:'Your next-week fuel requirement and stock status.'},
   {id:'planner',label:'Quick Fuel Planner',copy:'Build a simple fuel plan for any ride or session.'},
@@ -42,6 +40,15 @@ export function normalizeFuelView(value){
   const aliases={home:'home',overview:'home',planner:'planner','Quick Fuel Planner':'planner',training:'training','Training Fuel':'training',review:'review','Fuel Review':'review',stock:'stock','My Stock':'stock',order:'order','Order Needed':'order'};
   return aliases[value]||'home';
 }
+
+export const PROFILE_NAV=[
+  {id:'home',label:'Profile & Settings'},
+  {id:'details',label:'Athlete Details'},
+  {id:'connections',label:'Strava & Connections'},
+  {id:'reminders',label:'Reminders'},
+  {id:'learn',label:'Learn'},
+  {id:'install',label:'Install & Help'}
+];
 
 export const TRAINING_VIEWS=[
   {id:'overview',label:'Overview',legacy:'Overview',area:'training'},
@@ -62,58 +69,17 @@ const MAIN_ALIASES={
   shop:'shop',Shop:'shop'
 };
 
-export function normalizeMainRoute(value){
-  return MAIN_ALIASES[value]||'home';
-}
-
-export function trainingTabForRoute(route){
-  return APP_ROUTES[normalizeMainRoute(route)]?.trainingTab||null;
-}
-
-export function normalizeTrainingLegacy(value){
-  const direct=TRAINING_VIEWS.find(x=>x.legacy===value||x.id===value||x.label===value);
-  if(direct)return direct.legacy;
-  if(value==='My Season')return'My Race';
-  if(value==='Performance'||value==='Review'||value==='Compare')return'History';
-  return'My Plan';
-}
-
-export function normalizeTrainingView(value){
-  const aliases={
-    plan:'plan','My Plan':'plan',
-    history:'history',History:'history',
-    performance:'performance',Performance:'performance',
-    review:'review',Review:'review',Compare:'review','Plan vs Actual':'review'
-  };
-  return aliases[value]||'plan';
-}
-
-export function trainingTargetForView(value){
-  const id=normalizeTrainingView(value);
-  return TRAINING_NAV.find(item=>item.id===id)||TRAINING_NAV[0];
-}
-
-export function trainingViewFromState(state={}){
-  if(state?.jfTrainingView)return normalizeTrainingView(state.jfTrainingView);
-  if(state?.jfTrainingTab==='History'){
-    if(state?.jfTrainingSubView==='Performance')return'performance';
-    if(state?.jfTrainingSubView==='Compare')return'review';
-    return'history';
-  }
-  return'plan';
-}
-
-export function appAreaForTrainingTab(value){
-  const legacy=normalizeTrainingLegacy(value);
-  return TRAINING_VIEWS.find(x=>x.legacy===legacy)?.area||'training';
-}
+export function normalizeMainRoute(value){return MAIN_ALIASES[value]||'home'}
+export function trainingTabForRoute(route){return APP_ROUTES[normalizeMainRoute(route)]?.trainingTab||null}
+export function normalizeTrainingLegacy(value){const direct=TRAINING_VIEWS.find(x=>x.legacy===value||x.id===value||x.label===value);if(direct)return direct.legacy;if(value==='My Season')return'My Race';if(value==='Performance'||value==='Review'||value==='Compare')return'History';return'My Plan'}
+export function normalizeTrainingView(value){const aliases={plan:'plan','My Plan':'plan',history:'history',History:'history',performance:'performance',Performance:'performance',review:'review',Review:'review',Compare:'review','Plan vs Actual':'review'};return aliases[value]||'plan'}
+export function trainingTargetForView(value){const id=normalizeTrainingView(value);return TRAINING_NAV.find(item=>item.id===id)||TRAINING_NAV[0]}
+export function trainingViewFromState(state={}){if(state?.jfTrainingView)return normalizeTrainingView(state.jfTrainingView);if(state?.jfTrainingTab==='History'){if(state?.jfTrainingSubView==='Performance')return'performance';if(state?.jfTrainingSubView==='Compare')return'review';return'history'}return'plan'}
+export function appAreaForTrainingTab(value){const legacy=normalizeTrainingLegacy(value);return TRAINING_VIEWS.find(x=>x.legacy===legacy)?.area||'training'}
 
 export const HOME_INDEX_ITEMS=[
   {id:'training',title:'Training',copy:'Plan, history, performance and training review.',route:'training'},
   {id:'race',title:'Race',copy:'Your races, race guides, stages, water points and execution.',route:'race'},
-  {id:'fuel',title:'Fuel',copy:'Training fuel, reviews, stock and order requirements.',route:'fuel'},
-  {id:'shop',title:'Shop',copy:'Browse Just Fuel products and checkout.',route:'shop'},
-  {id:'planner',title:'Quick Fuel Planner',copy:'Build a simple fuel plan for any ride or session.',route:'fuel',fuelView:'planner'},
-  {id:'learn',title:'Learn',copy:'Fueling basics, product guidance and practical race-day advice.',homeView:'learn'},
-  {id:'settings',title:'Settings & Reminders',copy:'Install the app, reminders, help and account utilities.',homeView:'settings'}
+  {id:'fuel',title:'Fuel',copy:'Planner, training fuel, reviews, stock and order requirements.',route:'fuel'},
+  {id:'shop',title:'Shop',copy:'Browse Just Fuel products and checkout.',route:'shop'}
 ];
