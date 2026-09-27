@@ -6,7 +6,8 @@ import MorePage, { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
 import { FuelBuilder, ShopPage, LearnPage } from './CommercePages';
 import HomeIndex from './HomeIndex';
-import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, trainingTabForRoute, trainingTargetForView, trainingViewFromState } from './navigation-registry';
+import FuelHubV2 from './FuelHubV2';
+import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, normalizeFuelView, trainingTabForRoute, trainingTargetForView, trainingViewFromState } from './navigation-registry';
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
 
 const NAV_ICONS={home:Home,training:Activity,race:Flag,fuel:Fuel,shop:Store};
@@ -26,6 +27,7 @@ export default function ShellNextV3(){
   const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search,pathname:window.location.pathname}));
   const [homeView,setHomeView]=useState(()=>window.history.state?.jfHomeView||'index');
   const [trainingView,setTrainingView]=useState(()=>trainingViewFromState(window.history.state||{}));
+  const [fuelView,setFuelView]=useState(()=>normalizeFuelView(window.history.state?.jfFuelView));
   const [basket,setBasket]=useState(loadBasket);
   const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
@@ -33,15 +35,17 @@ export default function ShellNextV3(){
   const [installPrompt,setInstallPrompt]=useState(null);
   const [installed,setInstalled]=useState(false);
 
-  const isTrainingArea=['training','race','fuel'].includes(section);
+  const isTrainingArea=['training','race'].includes(section);
 
   function applySection(value){const next=normalizeMainSection(value);setSectionState(next);return next}
-  function setSection(value){
+  function setSection(value,options={}){
     const next=normalizeMainSection(value);
     const targetTab=trainingTabForRoute(next);
+    const nextFuelView=next==='fuel'?normalizeFuelView(options.fuelView||'home'):fuelView;
     setBasketOpen(false);
     if(next==='home')setHomeView('index');
     if(next==='training')setTrainingView('plan');
+    if(next==='fuel')setFuelView(nextFuelView);
     applySection(next);
     window.history.pushState({
       ...window.history.state,
@@ -49,6 +53,7 @@ export default function ShellNextV3(){
       jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,
       jfTrainingView:next==='training'?'plan':window.history.state?.jfTrainingView,
       jfTrainingSubView:next==='training'?null:window.history.state?.jfTrainingSubView,
+      jfFuelView:next==='fuel'?nextFuelView:window.history.state?.jfFuelView,
       jfHomeView:next==='home'?'index':window.history.state?.jfHomeView,
       jfBasket:false
     },'',window.location.href);
@@ -70,7 +75,7 @@ export default function ShellNextV3(){
     setHomeView(next);
     window.history.pushState({...window.history.state,jfSection:'home',jfHomeView:next,jfBasket:false},'',window.location.href);
   }
-  function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfHomeView:homeView,jfTrainingView:trainingView,jfBasket:true},'',window.location.href)}
+  function openBasket(){if(basketOpen)return;setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfHomeView:homeView,jfTrainingView:trainingView,jfFuelView:fuelView,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
   function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
@@ -88,13 +93,16 @@ export default function ShellNextV3(){
     const targetTab=trainingTabForRoute(section);
     const initialTrainingView=section==='training'?trainingViewFromState(window.history.state||{}):trainingView;
     const target=trainingTargetForView(initialTrainingView);
+    const initialFuelView=section==='fuel'?normalizeFuelView(window.history.state?.jfFuelView):fuelView;
     if(section==='training')setTrainingView(initialTrainingView);
+    if(section==='fuel')setFuelView(initialFuelView);
     window.history.replaceState({
       ...window.history.state,
       jfSection:section,
       jfTrainingTab:section==='training'?target.legacyTab:(targetTab||window.history.state?.jfTrainingTab),
       jfTrainingView:section==='training'?initialTrainingView:window.history.state?.jfTrainingView,
       jfTrainingSubView:section==='training'?target.subView:window.history.state?.jfTrainingSubView,
+      jfFuelView:section==='fuel'?initialFuelView:window.history.state?.jfFuelView,
       jfHomeView:section==='home'?(window.history.state?.jfHomeView||homeView):window.history.state?.jfHomeView,
       jfBasket:false
     },'',nextUrl);
@@ -103,6 +111,7 @@ export default function ShellNextV3(){
       setSectionState(next);
       setHomeView(e.state?.jfHomeView||'index');
       setTrainingView(trainingViewFromState(e.state||{}));
+      setFuelView(normalizeFuelView(e.state?.jfFuelView));
       setBasketOpen(Boolean(e.state?.jfBasket));
     };
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
@@ -124,7 +133,7 @@ export default function ShellNextV3(){
     window.addEventListener('jf-basket-updated',syncBasket);
     window.addEventListener('jf-open-basket',open);
     return ()=>{window.removeEventListener('jf-basket-updated',syncBasket);window.removeEventListener('jf-open-basket',open)};
-  },[section,basketOpen,homeView,trainingView]);
+  },[section,basketOpen,homeView,trainingView,fuelView]);
 
   useEffect(()=>{
     const standalone=window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;
@@ -168,6 +177,7 @@ export default function ShellNextV3(){
       {section==='home'&&homeView==='settings'&&<MorePage reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>} 
       {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
       {section==='training'&&<TrainingPhaseNav value={trainingView} onChange={openTrainingView}/>} 
+      {section==='fuel'&&<FuelHubV2 addLine={addLine} openBasket={openBasket} viewTarget={fuelView} onViewChange={setFuelView}/>} 
       {isTrainingArea&&<TrainingApp key={`${section}-${section==='training'?trainingView:'root'}`}/>} 
     </div>
 
