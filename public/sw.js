@@ -1,9 +1,17 @@
-const CACHE='just-fuel-v4';
+const CACHE='just-fuel-v5';
 const CORE=['/','/index.html','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
 
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(CORE)));
-  self.skipWaiting();
+  event.waitUntil((async()=>{
+    const cache=await caches.open(CACHE);
+    await Promise.all(CORE.map(async asset=>{
+      try{
+        const response=await fetch(asset,{cache:'reload'});
+        if(response.ok) await cache.put(asset,response);
+      }catch{}
+    }));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate',event=>{
