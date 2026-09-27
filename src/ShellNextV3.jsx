@@ -91,7 +91,7 @@ export default function ShellNextV3(){
     if(!installPrompt) return; await installPrompt.prompt(); try{await installPrompt.userChoice}catch{} setInstallPrompt(null);
   }
 
-  return <div className={`full-shell jf-next jf-v3 unified-app ${section==='Training'?'training-page':''}`}>
+  return <div className={`full-shell jf-next jf-v3 ${section==='Training'?'training-page':'light-page'}`}>
     {section!=='Training'&&<AppHeader count={basketCount} onBasket={openBasket}/>} 
     {section==='Training'&&<button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button>}
     {reminderDue&&section!=='Training'&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('Plan');dismissReminder()}} onDismiss={dismissReminder}/>} 
