@@ -11,6 +11,33 @@ export async function fetchTodayDashboard(client,today){
   return{dashboard:result.data||{},error:result.error||null};
 }
 
+export async function fetchTodayReadiness(client,userId,today){
+  const result=await client.from('training_readiness_checkins')
+    .select('id,checkin_date,sleep_quality,legs_freshness,soreness,motivation,resting_hr,note,score,status,load_ratio,suggested_factor,recommendation,target_session_id,adjustment_status,original_adjusted_minutes,applied_adjusted_minutes,updated_at')
+    .eq('user_id',userId)
+    .eq('checkin_date',today)
+    .maybeSingle();
+  return{readiness:result.data||null,error:result.error||null};
+}
+
+export async function saveMorningReadiness(client,today,values){
+  const result=await client.rpc('save_training_readiness',{
+    p_today:today,
+    p_sleep:Number(values.sleep),
+    p_legs:Number(values.legs),
+    p_soreness:Number(values.soreness),
+    p_motivation:Number(values.motivation),
+    p_resting_hr:values.restingHr?Number(values.restingHr):null,
+    p_note:values.note||null
+  });
+  return{readiness:result.data||null,error:result.error||null};
+}
+
+export async function applyMorningReadinessAdjustment(client,today,accept){
+  const result=await client.rpc('apply_training_readiness_adjustment',{p_today:today,p_accept:Boolean(accept)});
+  return{result:result.data||null,error:result.error||null};
+}
+
 export async function fetchTrainingPlan(client,userId){
   const[calendar,active]=await Promise.all([
     client.from('training_plan_calendar_with_fuel').select('*').eq('user_id',userId).order('session_date',{ascending:true}),
