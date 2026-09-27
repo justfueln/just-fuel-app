@@ -1,4 +1,4 @@
-const CACHE='just-fuel-v5';
+const CACHE='just-fuel-v6';
 const CORE=['/','/index.html','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
 
 self.addEventListener('install',event=>{
@@ -28,15 +28,16 @@ self.addEventListener('fetch',event=>{
   const url=new URL(request.url);
 
   // Never cache Supabase, Shopify or any other cross-origin/API response.
-  // This prevents authenticated training data and checkout/API traffic from being persisted in the PWA cache.
   if(url.origin!==self.location.origin) return;
 
   if(request.mode==='navigate'){
     event.respondWith(
-      fetch(request)
+      fetch(new Request(request,{cache:'reload'}))
         .then(response=>{
-          const copy=response.clone();
-          caches.open(CACHE).then(cache=>cache.put('/index.html',copy));
+          if(response.ok){
+            const copy=response.clone();
+            caches.open(CACHE).then(cache=>cache.put('/index.html',copy));
+          }
           return response;
         })
         .catch(()=>caches.match('/index.html'))
@@ -47,7 +48,7 @@ self.addEventListener('fetch',event=>{
   const networkFirst=['script','style','manifest'].includes(request.destination);
   if(networkFirst){
     event.respondWith(
-      fetch(request)
+      fetch(new Request(request,{cache:'reload'}))
         .then(response=>{
           if(response.ok){
             const copy=response.clone();
