@@ -1,4 +1,4 @@
-const CACHE='just-fuel-v7';
+const CACHE='just-fuel-v8';
 const CORE=['/','/index.html','/manifest.webmanifest','/icon.svg','/icon-192.png','/icon-512.png'];
 
 self.addEventListener('install',event=>{
