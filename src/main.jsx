@@ -27,6 +27,8 @@ import './checkout-v6.css';
 import './current-shell-v4.css';
 import './navigation-v1.css';
 import './navigation-v2.css';
+import './race-hub-v2.css';
+import './race-hub-v2-bridge.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
