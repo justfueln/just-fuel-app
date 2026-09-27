@@ -7,6 +7,7 @@ import NetworkStatus from './NetworkStatus';
 import './styles.css';
 import './shell-next.css';
 import './shell-v3.css';
+import './plan-readability.css';
 import './reminder-v2.css';
 import './training-fixes.css';
 import './training-fuel.css';
