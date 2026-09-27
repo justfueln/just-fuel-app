@@ -2,6 +2,8 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 import ShellNextV3 from './ShellNextV3';
+import ErrorBoundary from './ErrorBoundary';
+import NetworkStatus from './NetworkStatus';
 import './styles.css';
 import './shell-next.css';
 import './shell-v3.css';
@@ -13,6 +15,7 @@ import './season-v3.css';
 import './training-workout-details.css';
 import './training-simple-flow-v4.css';
 import './training-feedback.css';
+import './app-polish-v5.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
@@ -52,5 +55,10 @@ if ('serviceWorker' in navigator) {
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode><ShellNextV3 /></React.StrictMode>
+  <React.StrictMode>
+    <ErrorBoundary>
+      <NetworkStatus />
+      <ShellNextV3 />
+    </ErrorBoundary>
+  </React.StrictMode>
 );
