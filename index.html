@@ -15,46 +15,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      window.__JF_BOOT_CLEANUP__ = (async function () {
-        try {
-          var marker = 'jf-clean-current-app-v11';
-          if (sessionStorage.getItem(marker) === '1') return;
-
-          var registrations = [];
-          if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations) {
-            registrations = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(registrations.map(function (registration) {
-              return registration.unregister().catch(function () { return false; });
-            }));
-          }
-
-          var cacheNames = [];
-          if ('caches' in window && caches.keys) {
-            cacheNames = await caches.keys();
-            await Promise.all(cacheNames.map(function (name) {
-              return caches.delete(name).catch(function () { return false; });
-            }));
-          }
-
-          sessionStorage.setItem(marker, '1');
-
-          // If an old worker/cache existed, reload once after removing it so
-          // this page cannot keep executing a retired application bundle.
-          if (registrations.length || cacheNames.length || navigator.serviceWorker?.controller) {
-            var url = new URL(window.location.href);
-            url.searchParams.set('jfapp', '11');
-            window.location.replace(url.pathname + url.search + url.hash);
-            await new Promise(function () {});
-          }
-        } catch (error) {
-          console.warn('Just Fuel app cleanup:', error);
-        }
-      })();
-    </script>
-    <script type="module">
-      await window.__JF_BOOT_CLEANUP__;
-      await import('/src/main.jsx');
-    </script>
+    <script type="module" src="/src/main.jsx?v=11"></script>
   </body>
 </html>
