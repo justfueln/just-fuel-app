@@ -5,7 +5,7 @@ import CheckoutDrawer from './CheckoutDrawer';
 import MorePage, { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
 import { FuelBuilder, ShopPage, LearnPage } from './CommercePages';
-import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems } from './app-state-utils';
+import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
 
 const NAV = [
   ['Plan', Calculator], ['Learn', BookOpen], ['Shop', Store], ['Training', Activity], ['More', MoreHorizontal]
@@ -23,7 +23,7 @@ function loadLastBasket(){
 }
 
 export default function ShellNextV3(){
-  const [section,setSectionState]=useState('Plan');
+  const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search}));
   const [basket,setBasket]=useState(loadBasket);
   const [lastBasket,setLastBasket]=useState(loadLastBasket);
   const [basketOpen,setBasketOpen]=useState(false);
@@ -39,7 +39,14 @@ export default function ShellNextV3(){
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
 
   useEffect(()=>{
-    window.history.replaceState({...window.history.state,jfSection:'Plan',jfBasket:false},'',window.location.href);
+    const url=new URL(window.location.href);
+    const stravaReturn=url.searchParams.has('strava');
+    if(stravaReturn){
+      url.searchParams.delete('strava');
+      url.searchParams.delete('detail');
+    }
+    const nextUrl=stravaReturn?`${url.pathname}${url.search}${url.hash}`:window.location.href;
+    window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:section==='Training'?'Overview':window.history.state?.jfTrainingTab,jfBasket:false},'',nextUrl);
     const onPop=e=>{const next=normalizeMainSection(e.state?.jfSection||'Plan');setSectionState(next);setBasketOpen(Boolean(e.state?.jfBasket))};
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
