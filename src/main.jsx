@@ -16,6 +16,7 @@ import './season-v3.css';
 import './training-workout-details.css';
 import './training-simple-flow-v4.css';
 import './training-plan-compare.css';
+import './training-fuel-review.css';
 import './training-feedback.css';
 import './app-polish-v5.css';
 import './checkout-v6.css';
