@@ -35,12 +35,15 @@ import './mobile-ux-audit-v1.css';
 import './mobile-scroll-performance-v1.css';
 import './home-dashboard-v1.css';
 import './training-coach-v1.css';
+import './training-intelligence-v1.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
 import './training-simple-flow-v4';
 import './training-feedback';
 import './training-coach-v1';
+import './training-weather-v1';
+import './training-coach-review-v1';
 import './app-analytics';
 
 export const supabase = createClient(
