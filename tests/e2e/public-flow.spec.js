@@ -21,6 +21,11 @@ test('public shell navigation, fuel planner and shop basket work', async ({ page
   await expect(page.getByText(/added to basket/i)).toBeVisible();
   await page.getByRole('button', { name: 'View basket' }).click();
   await expect(page.getByText(/basket/i).first()).toBeVisible();
+
+  const flavour = page.getByLabel('Choose Energy Gel flavour').first();
+  await expect(flavour).toBeVisible();
+  await flavour.selectOption({ label: 'Lime' });
+  await expect(flavour.locator('option:checked')).toHaveText('Lime');
 });
 
 test('physical current recovery route opens the current app', async ({ page }) => {
