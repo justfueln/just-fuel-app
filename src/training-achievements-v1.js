@@ -97,7 +97,7 @@ function reset(){cacheAt=0;achievements=[];completionRows=[]}
 
 if(typeof window!=='undefined'){
   window.addEventListener('load',()=>queue());window.addEventListener('popstate',()=>queue());
-  ['jf-training-plan-updated','jf-training-feedback-saved','jf-recovery-logged'].forEach(name=>window.addEventListener(name,()=>{reset();queue(true)}));
+  ['jf-training-plan-updated','jf-training-feedback-saved','jf-recovery-logged','jf-strava-synced','jf-training-achievements-refresh'].forEach(name=>window.addEventListener(name,()=>{reset();queue(true)}));
   const start=()=>{if(!document.body)return;new MutationObserver(m=>{if(m.some(x=>x.addedNodes.length||x.removedNodes.length))queue()}).observe(document.body,{childList:true,subtree:true});queue()};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 }
