@@ -2,15 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const mainUrl=new URL('../src/main.jsx',import.meta.url);
+const routeEnhancementsUrl=new URL('../src/route-enhancements.js',import.meta.url);
 const guardUrl=new URL('../src/race-addon-stability.js',import.meta.url);
 
 test('Race mutation guard loads before the two legacy Race add-ons',async()=>{
-  const source=await readFile(mainUrl,'utf8');
-  const guard=source.indexOf("import('./race-addon-stability')");
-  const progress=source.indexOf("import('./race-goal-progress-v1')");
-  const rehearsal=source.indexOf("import('./race-fuel-rehearsal-v1')");
-  assert.ok(guard>=0);
+  const source=await readFile(routeEnhancementsUrl,'utf8');
+  const raceScope=source.indexOf("section==='race'");
+  const guard=source.indexOf("import('./race-addon-stability')",raceScope);
+  const progress=source.indexOf("import('./race-goal-progress-v1')",guard);
+  const rehearsal=source.indexOf("import('./race-fuel-rehearsal-v1')",guard);
+  assert.ok(raceScope>=0);
+  assert.ok(guard>raceScope);
   assert.ok(progress>guard);
   assert.ok(rehearsal>guard);
 });
