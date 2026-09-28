@@ -59,16 +59,18 @@ function renderDetails(body,data,sessionRow){
   body.replaceChildren();
   const purpose=el('div','workout-purpose');purpose.append(el('span','','WHY THIS SESSION'),el('strong','',data.purpose));body.append(purpose);
   body.append(el('p','workout-description',data.description));
+  if(data.target_text){const target=el('div','workout-fuel-line');target.append(el('span','','TARGET'),el('strong','',data.target_text));if(data.secondary_target_text)target.append(el('small','',data.secondary_target_text));body.append(target)}
   body.append(el('div','workout-breakdown-title','WORKOUT BREAKDOWN'));
   const list=el('div','workout-step-list');
   (data.steps||[]).forEach((s,i)=>{
     const row=el('div','workout-step-row');row.append(el('span','workout-step-number',String(i+1)));
     const copy=el('div','workout-step-copy');const top=el('div','workout-step-top');top.append(el('strong','',s.name),el('b','',niceDuration(s.seconds)));copy.append(top);
-    const target=s.powerLow&&s.powerHigh?`${s.powerLow}–${s.powerHigh} W`:s.intensity==='rest'?'Easy recovery':'Open effort';copy.append(el('span','workout-step-target',target));
+    const target=s.targetText||(s.powerLow&&s.powerHigh?`${s.powerLow}–${s.powerHigh} W`:s.intensity==='rest'?'Easy recovery':'Open effort');copy.append(el('span','workout-step-target',target));
     if(s.notes)copy.append(el('small','',s.notes));row.append(copy);list.append(row);
   });
   body.append(list);
-  const fuel=fuelLine(sessionRow);if(fuel){const f=el('div','workout-fuel-line');f.append(el('span','','FUEL'),el('strong','',fuel));body.append(f)}
+  const fuel=fuelLine(sessionRow);if(fuel){const f=el('div','workout-fuel-line');f.append(el('span','','FUEL'),el('strong','',fuel));if(sessionRow.fueling_note)f.append(el('small','',sessionRow.fueling_note));body.append(f)}
+  if(Number(sessionRow.hydration_ml_per_hour)>0){const h=el('div','workout-fuel-line');h.append(el('span','','HYDRATION'),el('strong','',`${sessionRow.hydration_ml_per_hour} ml/h${Number(sessionRow.sodium_target_mg_per_hour)>0?` · ${sessionRow.sodium_target_mg_per_hour} mg sodium/h`:''}`));if(sessionRow.hydration_note)h.append(el('small','',sessionRow.hydration_note));body.append(h)}
   if(Number(sessionRow.recover_servings)>0){const recovery=el('div','workout-recovery-line');recovery.append(el('span','','RECOVER'),el('strong','',`${sessionRow.recover_servings} × Just Fuel Recover after training`));if(sessionRow.recovery_note)recovery.append(el('small','',sessionRow.recovery_note));body.append(recovery)}
   if(data.downloadable!==false)renderGarminSync(body,data);
 }
