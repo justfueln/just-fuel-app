@@ -54,6 +54,16 @@ test('workout cards can display power heart rate pace or RPE targets',async()=>{
   for(const metric of ["metric==='power'","metric==='heart_rate'","metric==='pace'","target_rpe_low"])assert.ok(source.includes(metric),`missing ${metric}`);
   assert.match(source,/\/km/);
   assert.match(source,/bpm/);
+  assert.match(source,/v==='pace'\?'PACE':'RPE'/);
+  assert.match(source,/RPE \$\{row\.target_rpe_low\}–\$\{row\.target_rpe_high\}\/10/);
+});
+
+test('non-power workout steps are repaired to the resolved sport target',async()=>{
+  const source=await readFile(targetsUrl,'utf8');
+  assert.match(source,/repairWorkoutStepTargets/);
+  assert.match(source,/metric==='power'/);
+  assert.match(source,/Easy · RPE 2–3\/10/);
+  assert.match(source,/target\.textContent=primary/);
 });
 
 test('expanded workout details prefer sport-aware target text and show hydration guidance',async()=>{
