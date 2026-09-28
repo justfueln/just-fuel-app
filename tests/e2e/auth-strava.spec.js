@@ -36,7 +36,7 @@ function json(route,data,status=200){
   return route.fulfill({status,contentType:'application/json',body:JSON.stringify(data),headers:{'content-range':'0-0/*'}});
 }
 
-test('signed-in athlete can open Strava connections and run a sync', async ({ page }) => {
+test('signed-in athlete keeps session and can run repeated Strava sync flow', async ({ page }) => {
   await installSession(page);
 
   await page.route(`${SUPABASE}/rest/v1/**`,route=>{
@@ -68,4 +68,10 @@ test('signed-in athlete can open Strava connections and run a sync', async ({ pa
 
   await page.getByRole('button',{name:'Sync now'}).click();
   await expect(page.getByText(/Strava synced · 2 upcoming sessions checked or adjusted\./i)).toBeVisible();
+
+  // A fresh app navigation must reuse the persisted Supabase session instead of asking for OTP again.
+  await page.goto('/?jfapp=16&legacy=cleared&e2e=session-reload');
+  await expect(page.getByText('JUST FUEL').first()).toBeVisible();
+  await page.getByRole('button',{name:'Profile and settings'}).click();
+  await expect(page.getByText('athlete@example.com')).toBeVisible();
 });
