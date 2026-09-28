@@ -41,13 +41,22 @@ test('signed-in athlete can open Strava connections and run a sync', async ({ pa
 
   await page.route(`${SUPABASE}/rest/v1/**`,route=>{
     const url=new URL(route.request().url());
-    const table=url.pathname.split('/').pop();
-    if(table==='training_setup_status')return json(route,[{user_id:USER_ID,next_step:'ready',strava_connected:true}]);
-    if(table==='training_profiles')return json(route,[{user_id:USER_ID,primary_sport:'cycling',available_weekdays:[2,4,6],long_session_weekday:6}]);
+    const parts=url.pathname.split('/').filter(Boolean);
+    const name=parts.at(-1);
+    if(parts.includes('rpc')){
+      if(name==='refresh_training_sport_detection')return json(route,{ok:true,algorithm_version:'sport-detection-v1'});
+      if(name==='refresh_training_plan_adaptation')return json(route,{ok:true,changed_sessions:2,algorithm_version:'adaptive-coach-v5-sport-aware'});
+      if(name==='refresh_training_progression')return json(route,{ok:true,sessions_checked:2,algorithm_version:'training-progression-v4-sport-aware'});
+      if(name==='refresh_training_session_targets')return json(route,{ok:true,updated_sessions:2,algorithm_version:'session-target-resolver-v2'});
+      return json(route,{ok:true});
+    }
+    if(name==='training_setup_status')return json(route,[{user_id:USER_ID,next_step:'ready',strava_connected:true}]);
+    if(name==='training_profiles')return json(route,[{user_id:USER_ID,primary_sport:'cycling',available_weekdays:[2,4,6],long_session_weekday:6}]);
+    if(name==='training_sport_profiles')return json(route,[]);
     return json(route,[]);
   });
 
-  await page.route(`${SUPABASE}/functions/v1/strava-sync`,route=>json(route,{ok:true,plan_adaptation:{changed_sessions:2}}));
+  await page.route(`${SUPABASE}/functions/v1/strava-sync`,route=>json(route,{ok:true}));
 
   await page.goto('/?jfapp=16&legacy=cleared&e2e=auth-strava');
   await expect(page.getByText('JUST FUEL').first()).toBeVisible();

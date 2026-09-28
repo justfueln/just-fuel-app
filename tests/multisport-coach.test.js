@@ -43,6 +43,17 @@ test('Strava sync refreshes sensor detection and workout targets',async()=>{
   assert.match(source,/jf-strava-synced/);
 });
 
+test('Strava sync reruns adaptive plan and progression before target refresh',async()=>{
+  const source=await readFile(apiUrl,'utf8');
+  const detection=source.indexOf("refresh_training_sport_detection");
+  const adaptation=source.indexOf("refresh_training_plan_adaptation",detection);
+  const progression=source.indexOf("refresh_training_progression",adaptation);
+  const targets=source.indexOf("refresh_training_session_targets",progression);
+  assert.ok(detection>=0&&adaptation>detection&&progression>adaptation&&targets>progression);
+  assert.match(source,/plan_adaptation:adaptation\.data\|\|null/);
+  assert.match(source,/progression:progression\.data\|\|null/);
+});
+
 test('current shell loads multisport workout target enhancement',async()=>{
   const source=await readFile(mainUrl,'utf8');
   assert.match(source,/training-multisport-targets-v1\.css/);

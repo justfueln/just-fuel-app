@@ -135,8 +135,20 @@ export async function syncTrainingStrava(client){
       const uid=auth.data.session?.user?.id;
       if(uid){
         const detection=await client.rpc('refresh_training_sport_detection',{p_user_id:uid});
+        const adaptation=await client.rpc('refresh_training_plan_adaptation',{p_user_id:uid});
+        const progression=await client.rpc('refresh_training_progression',{p_user_id:uid});
         const targets=await client.rpc('refresh_training_session_targets',{p_user_id:uid});
-        result.data={...(result.data||{}),sport_detection:detection.data||null,sport_detection_warning:detection.error?.message||null,session_targets:targets.data||null,session_targets_warning:targets.error?.message||null};
+        result.data={
+          ...(result.data||{}),
+          sport_detection:detection.data||null,
+          sport_detection_warning:detection.error?.message||null,
+          plan_adaptation:adaptation.data||null,
+          plan_adaptation_warning:adaptation.error?.message||null,
+          progression:progression.data||null,
+          progression_warning:progression.error?.message||null,
+          session_targets:targets.data||null,
+          session_targets_warning:targets.error?.message||null
+        };
       }
     }catch{}
   }
