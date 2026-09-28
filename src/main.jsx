@@ -64,7 +64,7 @@ import './race-goal-progress-v1';
 import './race-fuel-rehearsal-v1';
 import './app-analytics';
 
-const CURRENT_APP_VERSION='13';
+const CURRENT_APP_VERSION='14';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
