@@ -63,6 +63,7 @@ import './training-progression-v1';
 import './training-ftp-detection-v1';
 import './training-power-curve-v1';
 import './training-achievements-v1';
+import './race-addon-stability';
 import './race-goal-progress-v1';
 import './race-fuel-rehearsal-v1';
 import './race-week-execution-v1';
