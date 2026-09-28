@@ -64,6 +64,8 @@ import './race-goal-progress-v1';
 import './race-fuel-rehearsal-v1';
 import './app-analytics';
 
+const CURRENT_APP_VERSION='13';
+
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
   'sb_publishable_dQVErA2uFoym91L-vsW-kw_n6dWJfqy',
@@ -72,23 +74,25 @@ export const supabase = createClient(
 
 async function purgeLegacyPwa(){
   try{
-    const marker='jf-current-app-clean-v11';
-    if(sessionStorage.getItem(marker)==='1') return false;
-
     let registrations=[];
+    let cacheNames=[];
+    const hadController=Boolean(navigator.serviceWorker?.controller);
+
     if('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations){
       registrations=await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(reg=>reg.unregister().catch(()=>false)));
+      await Promise.all(registrations.map(async reg=>{
+        try{reg.waiting?.postMessage('JF_RETIRE_LEGACY')}catch{}
+        try{reg.active?.postMessage('JF_RETIRE_LEGACY')}catch{}
+        try{return await reg.unregister()}catch{return false}
+      }));
     }
 
-    let cacheNames=[];
     if('caches' in window && caches.keys){
       cacheNames=await caches.keys();
       await Promise.all(cacheNames.map(name=>caches.delete(name).catch(()=>false)));
     }
 
-    sessionStorage.setItem(marker,'1');
-    return registrations.length>0 || cacheNames.length>0 || Boolean(navigator.serviceWorker?.controller);
+    return registrations.length>0 || cacheNames.length>0 || hadController;
   }catch(error){
     console.warn('Legacy Just Fuel PWA cleanup failed:',error);
     return false;
@@ -97,9 +101,12 @@ async function purgeLegacyPwa(){
 
 async function boot(){
   const cleaned=await purgeLegacyPwa();
-  if(cleaned){
-    const url=new URL(window.location.href);
-    url.searchParams.set('jfapp','11');
+  const url=new URL(window.location.href);
+  const alreadyCleared=url.searchParams.get('legacy')==='cleared'&&url.searchParams.get('jfapp')===CURRENT_APP_VERSION;
+
+  if(cleaned&&!alreadyCleared){
+    url.searchParams.set('jfapp',CURRENT_APP_VERSION);
+    url.searchParams.set('legacy','cleared');
     window.location.replace(`${url.pathname}${url.search}${url.hash}`);
     return;
   }
