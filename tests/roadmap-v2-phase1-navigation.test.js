@@ -22,13 +22,15 @@ test('Training keeps a small direct navigation surface',async()=>{
   assert.doesNotMatch(shell,/>More<\/button>/);
 });
 
-test('Fuel exposes Quick Planner and Training Fuel directly, with secondary tools behind More',async()=>{
+test('Fuel exposes only Plan Fuel and Update Stock as primary actions',async()=>{
   const registry=await import(`${registryUrl.href}?fuel=${Date.now()}`);
-  assert.deepEqual(registry.FUEL_NAV.filter(x=>x.group==='primary').map(x=>x.id),['planner','training']);
-  assert.deepEqual(registry.FUEL_NAV.filter(x=>x.group==='more').map(x=>x.id),['review','stock','order']);
+  assert.deepEqual(registry.FUEL_NAV.filter(x=>x.group==='primary').map(x=>x.id),['training','stock']);
+  assert.deepEqual(registry.FUEL_NAV.filter(x=>x.group==='utility').map(x=>x.id),['planner','review']);
+  assert.deepEqual(registry.FUEL_NAV.filter(x=>x.group==='contextual').map(x=>x.id),['order']);
   const fuel=await readFile(fuelUrl,'utf8');
-  assert.match(fuel,/More tools/);
-  assert.match(fuel,/fuel-v2-more-panel/);
+  assert.match(fuel,/What do I need\?/);
+  assert.match(fuel,/aria-label="Fuel actions"/);
+  assert.doesNotMatch(fuel,/More tools/);
 });
 
 test('Race exposes only Race Plan, Fuel and Checklist as primary race actions',async()=>{
