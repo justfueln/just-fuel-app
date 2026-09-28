@@ -1,3 +1,6 @@
+const OTP_SEND_COOLDOWN_MS=60000;
+const OTP_SEND_KEY='jf-training-otp-last-send';
+
 export async function fetchTrainingCore(client,userId){
   const[setup,home]=await Promise.all([
     client.from('training_setup_status').select('*').eq('user_id',userId).maybeSingle(),
@@ -98,29 +101,50 @@ export async function fetchTrainingFuelForecast(client,userId){
 export async function fetchTrainingHistory(client,userId){
   const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,effective_average_heartrate,effective_max_heartrate,effective_average_cadence,effective_average_watts,effective_weighted_average_watts,effective_kilojoules,effective_calories,trainer,manual,had_duplicate,duplicate_confidence,synced_at,estimated_training_load,load_source,load_confidence,sport_family';
   const rows=[];
+  const seen=new Set();
   const pageSize=500;
   for(let from=0;;from+=pageSize){
     const result=await client.from('training_activity_metrics').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).range(from,from+pageSize-1);
     if(result.error)return{history:[],error:result.error};
-    const page=(result.data||[]).map(row=>({
-      ...row,
-      average_heartrate:row.effective_average_heartrate,
-      max_heartrate:row.effective_max_heartrate,
-      average_cadence:row.effective_average_cadence,
-      average_watts:row.effective_average_watts,
-      weighted_average_watts:row.effective_weighted_average_watts,
-      kilojoules:row.effective_kilojoules,
-      calories:row.effective_calories,
-      raw:{suffer_score:Number(row.estimated_training_load)||0,jf_load_source:row.load_source,jf_load_confidence:row.load_confidence}
-    }));
-    rows.push(...page);
+    const page=result.data||[];
+    for(const row of page){
+      const key=row.strava_activity_id!=null?`strava:${row.strava_activity_id}`:`row:${row.id}`;
+      if(seen.has(key))continue;
+      seen.add(key);
+      rows.push({
+        ...row,
+        average_heartrate:row.effective_average_heartrate,
+        max_heartrate:row.effective_max_heartrate,
+        average_cadence:row.effective_average_cadence,
+        average_watts:row.effective_average_watts,
+        weighted_average_watts:row.effective_weighted_average_watts,
+        kilojoules:row.effective_kilojoules,
+        calories:row.effective_calories,
+        raw:{suffer_score:Number(row.estimated_training_load)||0,jf_load_source:row.load_source,jf_load_confidence:row.load_confidence}
+      });
+    }
     if(page.length<pageSize)break;
   }
   return{history:rows,error:null};
 }
 
 export async function sendTrainingOtp(client,email){
-  return client.auth.signInWithOtp({email});
+  if(typeof window!=='undefined'){
+    try{
+      const last=Number(localStorage.getItem(OTP_SEND_KEY)||0);
+      const waitMs=Math.max(0,OTP_SEND_COOLDOWN_MS-(Date.now()-last));
+      if(waitMs>0){
+        const seconds=Math.max(1,Math.ceil(waitMs/1000));
+        return{data:null,error:{message:`Please wait ${seconds} seconds before requesting another login code.`}};
+      }
+    }catch{}
+  }
+
+  const result=await client.auth.signInWithOtp({email});
+  if(!result.error&&typeof window!=='undefined'){
+    try{localStorage.setItem(OTP_SEND_KEY,String(Date.now()))}catch{}
+  }
+  return result;
 }
 
 export async function verifyTrainingOtp(client,email,token){
