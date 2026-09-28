@@ -30,7 +30,15 @@ export async function saveMorningReadiness(client,today,values){
     p_resting_hr:values.restingHr?Number(values.restingHr):null,
     p_note:values.note||null
   });
-  return{readiness:result.data||null,error:result.error||null};
+  if(result.error)return{readiness:null,error:result.error};
+  const auth=await client.auth.getSession();
+  const uid=auth.data.session?.user?.id;
+  let adaptation=null,progression=null;
+  if(uid){
+    try{const r=await client.rpc('refresh_training_plan_adaptation',{p_user_id:uid});adaptation=r.data||null}catch{}
+    try{const r=await client.rpc('refresh_training_progression',{p_user_id:uid});progression=r.data||null}catch{}
+  }
+  return{readiness:result.data||null,error:null,adaptation,progression};
 }
 
 export async function applyMorningReadinessAdjustment(client,today,accept){
