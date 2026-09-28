@@ -7,6 +7,9 @@ test('public shell navigation, fuel planner and shop basket work', async ({ page
   await expect(page.getByRole('heading', { name: /Train\. Race\. Fuel\./i })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Training', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Training Login' })).toBeVisible();
+
   await page.getByRole('button', { name: 'Fuel', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your fueling hub' })).toBeVisible();
   await page.getByRole('button', { name: /Quick Fuel Planner/i }).click();
