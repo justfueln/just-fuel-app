@@ -5,18 +5,21 @@ import {LearnPage} from './CommercePages';
 import {SHOP_DOMAIN,WHATSAPP_NUMBER} from './catalog';
 import {DAY_NAMES,REMINDER_DEFAULT,buildReminderIcs,nextReminderLabel} from './reminder-utils';
 import {fetchTrainingProfile,startTrainingStrava,syncTrainingStrava} from './training-api';
+import {ageFromDob,dobIsValid,estimatedMaxHrFromDob} from './athlete-profile-utils';
 
 const DAY_OPTIONS=[[1,'Mon'],[2,'Tue'],[3,'Wed'],[4,'Thu'],[5,'Fri'],[6,'Sat'],[7,'Sun']];
 const SPORT_OPTIONS=[['cycling','Cycle'],['running','Run / Jog'],['triathlon','Triathlon'],['hyrox','HYROX']];
+const EXPERIENCE_OPTIONS=[['beginner','Beginner'],['intermediate','Intermediate'],['advanced','Experienced / competitive']];
 const SOURCE_OPTIONS={cycling:[['auto','Auto — recommended'],['power','Power'],['heart_rate','Heart rate'],['rpe','Effort / RPE']],running:[['auto','Auto — recommended'],['pace','Pace'],['heart_rate','Heart rate'],['rpe','Effort / RPE']]};
 
 function fmtPace(value){const n=Math.round(Number(value)||0);if(!n)return'';return`${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`}
 function parsePace(value){const s=String(value||'').trim();if(!s)return null;if(/^\d+(\.\d+)?$/.test(s))return Number(s);const m=s.match(/^(\d{1,2}):([0-5]\d)$/);return m?Number(m[1])*60+Number(m[2]):null}
+function localDateKey(){const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`}
 function sportRow(rows,family){return(rows||[]).find(x=>x.sport_family===family)||null}
 function initialSports(profile){const saved=Array.isArray(profile?.sports_enabled)?profile.sports_enabled.filter(x=>SPORT_OPTIONS.some(([k])=>k===x)):[];if(saved.length)return saved;const p=String(profile?.primary_sport||'cycling').toLowerCase();if(p==='triathlon')return['triathlon'];if(p==='hyrox')return['hyrox'];if(p.includes('run'))return['running'];return['cycling']}
 function effectiveFamilies(sports){const set=new Set();if(sports.includes('cycling')||sports.includes('triathlon'))set.add('cycling');if(sports.includes('running')||sports.includes('triathlon'))set.add('running');if(sports.includes('triathlon'))set.add('swimming');if(sports.includes('hyrox'))set.add('hyrox');return set}
 function capabilityCopy(row,family){const bits=[];if(family==='cycling'&&row?.detected_power)bits.push('Power detected');if(row?.detected_hr)bits.push('HR detected');if(family==='running'&&row?.detected_pace)bits.push('GPS pace detected');return bits.length?bits.join(' · '):'No sensor requirement — RPE fallback is always available'}
-function resolvedSource(row,family,form,global){const pref=form?.preferred||row?.preferred_intensity_source||'auto';const hrReady=Boolean(form?.threshold_hr||form?.max_hr||global?.max_hr||row?.threshold_hr||row?.max_hr||row?.observed_max_hr);if(pref!=='auto'){if(pref==='power'&&form?.ftp)return'Power';if(pref==='pace'&&(parsePace(form?.threshold_pace)||row?.estimated_threshold_pace_sec_per_km))return'Pace';if(pref==='heart_rate'&&hrReady)return'Heart rate';if(pref==='rpe')return'Effort / RPE'}if(family==='cycling'&&row?.detected_power&&form?.ftp)return'Power';if(family==='running'&&row?.detected_pace&&(parsePace(form?.threshold_pace)||row?.estimated_threshold_pace_sec_per_km))return'Pace';if(row?.detected_hr&&hrReady)return'Heart rate';return'Effort / RPE'}
+function resolvedSource(row,family,form,global){const pref=form?.preferred||row?.preferred_intensity_source||'auto';const hrReady=Boolean(form?.threshold_hr||form?.max_hr||global?.max_hr||global?.estimated_max_hr||row?.threshold_hr||row?.max_hr||row?.observed_max_hr);if(pref!=='auto'){if(pref==='power'&&form?.ftp)return'Power';if(pref==='pace'&&(parsePace(form?.threshold_pace)||row?.estimated_threshold_pace_sec_per_km))return'Pace';if(pref==='heart_rate'&&hrReady)return'Heart rate';if(pref==='rpe')return'Effort / RPE'}if(family==='cycling'&&row?.detected_power&&form?.ftp)return'Power';if(family==='running'&&row?.detected_pace&&(parsePace(form?.threshold_pace)||row?.estimated_threshold_pace_sec_per_km))return'Pace';if(row?.detected_hr&&hrReady)return'Heart rate';return'Effort / RPE'}
 
 export default function ProfileHub({onClose,reminder,setReminder,requestReminderPermission,installed,installPrompt,installApp}){
   const[page,setPage]=useState('home');
@@ -63,7 +66,7 @@ export default function ProfileHub({onClose,reminder,setReminder,requestReminder
     </section>
     {status&&<div className="notice">{status}</div>}
     <div className="profile-menu">
-      <ProfileItem icon={UserRound} title="Athlete Details" copy="Sports, training days, sensors and automatic power / HR / pace / RPE coaching." onClick={()=>open('details')}/>
+      <ProfileItem icon={UserRound} title="Athlete Details" copy="Sports, age, training days, sensors and automatic power / HR / pace / RPE coaching." onClick={()=>open('details')}/>
       <ProfileItem icon={Link2} title="Strava & Connections" copy={strava?'Strava connected. Sync or disconnect here.':'Connect Strava and manage training sync.'} onClick={()=>open('connections')}/>
       <ProfileItem icon={Bell} title="Reminders" copy="Weekly fuel-check reminder and phone calendar alert." onClick={()=>open('reminders')}/>
       <ProfileItem icon={BookOpen} title="Learn" copy="Fueling basics, product use and race-day guidance." onClick={()=>open('learn')}/>
@@ -77,8 +80,8 @@ function ProfileFrame({title,subtitle,onBack,children}){return <div className="p
 function ProfileItem({icon:Icon,title,copy,onClick}){return <button className="profile-menu-item" onClick={onClick}><span><Icon size={20}/></span><div><strong>{title}</strong><small>{copy}</small></div><ChevronRight size={19}/></button>}
 
 function AthleteDetails({session,profile,sportProfiles,onSaved}){
-  const[days,setDays]=useState([2,4,6]),[longDay,setLongDay]=useState(6),[sports,setSports]=useState(['cycling']),[weight,setWeight]=useState(''),[saving,setSaving]=useState(false),[status,setStatus]=useState('');
-  const[advanced,setAdvanced]=useState({resting_hr:'',max_hr:'',weekly_hours_target:'',weekday_session_minutes:90,long_session_max_minutes:300});
+  const[days,setDays]=useState([2,4,6]),[longDay,setLongDay]=useState(6),[sports,setSports]=useState(['cycling']),[weight,setWeight]=useState(''),[dob,setDob]=useState(''),[experience,setExperience]=useState('intermediate'),[saving,setSaving]=useState(false),[status,setStatus]=useState('');
+  const[advanced,setAdvanced]=useState({resting_hr:'',max_hr:'',weekly_hours_target:'',weekday_session_minutes:90,long_session_max_minutes:300,training_start_time:'',training_location_name:'',training_notes:''});
   const[cycling,setCycling]=useState({preferred:'auto',ftp:'',threshold_hr:'',max_hr:''});
   const[running,setRunning]=useState({preferred:'auto',threshold_pace:'',threshold_hr:'',max_hr:''});
   const cycleRow=sportRow(sportProfiles,'cycling'),runRow=sportRow(sportProfiles,'running');
@@ -86,31 +89,36 @@ function AthleteDetails({session,profile,sportProfiles,onSaved}){
   useEffect(()=>{
     if(!profile)return;
     const c=sportRow(sportProfiles,'cycling'),r=sportRow(sportProfiles,'running');
-    setDays(profile.available_weekdays||[2,4,6]);setLongDay(profile.long_session_weekday||6);setSports(initialSports(profile));setWeight(profile.weight_kg||'');
-    setAdvanced({resting_hr:profile.resting_hr||'',max_hr:profile.max_hr||'',weekly_hours_target:profile.weekly_hours_target||'',weekday_session_minutes:profile.weekday_session_minutes||90,long_session_max_minutes:profile.long_session_max_minutes||300});
+    setDays(profile.available_weekdays||[2,4,6]);setLongDay(profile.long_session_weekday||6);setSports(initialSports(profile));setWeight(profile.weight_kg||'');setDob(profile.date_of_birth||'');setExperience(profile.experience_level||'intermediate');
+    setAdvanced({resting_hr:profile.resting_hr||'',max_hr:profile.max_hr||'',weekly_hours_target:profile.weekly_hours_target||'',weekday_session_minutes:profile.weekday_session_minutes||90,long_session_max_minutes:profile.long_session_max_minutes||300,training_start_time:String(profile.training_start_time||'').slice(0,5),training_location_name:profile.training_location_name||'',training_notes:profile.training_notes||''});
     setCycling({preferred:c?.preferred_intensity_source||'auto',ftp:c?.ftp_w||profile.ftp_w||'',threshold_hr:c?.threshold_hr||'',max_hr:c?.max_hr||''});
     setRunning({preferred:r?.preferred_intensity_source||'auto',threshold_pace:fmtPace(r?.threshold_pace_sec_per_km||r?.estimated_threshold_pace_sec_per_km)||'',threshold_hr:r?.threshold_hr||'',max_hr:r?.max_hr||''});
-  },[profile?.user_id,JSON.stringify(sportProfiles)]);
+  },[profile?.user_id,profile?.updated_at,JSON.stringify(sportProfiles)]);
 
   const families=useMemo(()=>effectiveFamilies(sports),[sports]);
+  const age=ageFromDob(dob),estimatedMaxHr=estimatedMaxHrFromDob(dob);
+  const hrContext={...advanced,estimated_max_hr:estimatedMaxHr};
   const toggleDay=d=>setDays(v=>v.includes(d)?v.filter(x=>x!==d):[...v,d].sort((a,b)=>a-b));
   const toggleSport=s=>setSports(v=>v.includes(s)?v.filter(x=>x!==s):[...v,s]);
   const primarySport=sports.includes('triathlon')?'triathlon':sports[0]||'cycling';
-  const cycleCoach=resolvedSource(cycleRow,'cycling',cycling,advanced),runCoach=resolvedSource(runRow,'running',running,advanced);
+  const cycleCoach=resolvedSource(cycleRow,'cycling',cycling,hrContext),runCoach=resolvedSource(runRow,'running',running,hrContext);
 
   async function save(){
     if(!session?.user)return setStatus('Sign in under Training first.');
     if(!sports.length)return setStatus('Select at least one sport.');
+    if(dob&&!dobIsValid(dob))return setStatus('Enter a valid date of birth.');
     const runPace=running.threshold_pace?parsePace(running.threshold_pace):null;
     if(running.threshold_pace&&!runPace)return setStatus('Running threshold pace must look like 4:45 per km.');
     setSaving(true);setStatus('Saving athlete details and updating coach targets…');
     const uid=session.user.id;
     const profileResult=await supabase.from('training_profiles').upsert({
       user_id:uid,primary_sport:primarySport,sports_enabled:sports,available_weekdays:days,long_session_weekday:Number(longDay),
+      date_of_birth:dob||null,experience_level:experience,
       ftp_w:cycling.ftp?Number(cycling.ftp):null,weight_kg:weight?Number(weight):null,
       resting_hr:advanced.resting_hr?Number(advanced.resting_hr):null,max_hr:advanced.max_hr?Number(advanced.max_hr):null,
       weekly_hours_target:advanced.weekly_hours_target?Number(advanced.weekly_hours_target):null,
-      weekday_session_minutes:Number(advanced.weekday_session_minutes||90),long_session_max_minutes:Number(advanced.long_session_max_minutes||300)
+      weekday_session_minutes:Number(advanced.weekday_session_minutes||90),long_session_max_minutes:Number(advanced.long_session_max_minutes||300),
+      training_start_time:advanced.training_start_time||null,training_location_name:advanced.training_location_name.trim()||null,training_notes:advanced.training_notes.trim()||null
     },{onConflict:'user_id'});
     if(profileResult.error){setStatus(profileResult.error.message);setSaving(false);return}
 
@@ -129,7 +137,7 @@ function AthleteDetails({session,profile,sportProfiles,onSaved}){
     const detection=await supabase.rpc('refresh_training_sport_detection',{p_user_id:uid});
     const targets=await supabase.rpc('refresh_training_session_targets',{p_user_id:uid});
     if(detection.error||targets.error)setStatus(`Details saved, but coach targets need a refresh: ${detection.error?.message||targets.error?.message}`);
-    else setStatus('Athlete details saved. The coach will now choose power, heart rate, pace or RPE automatically for each sport.');
+    else setStatus('Athlete details saved. Better HR data will always override the age estimate automatically.');
     window.dispatchEvent(new CustomEvent('jf-training-plan-updated'));
     await onSaved?.();setSaving(false);
   }
@@ -140,9 +148,11 @@ function AthleteDetails({session,profile,sportProfiles,onSaved}){
       <span className="eyebrow">ATHLETE PROFILE</span><h3>Tell the coach what you do. Sensors are optional.</h3>
       <label>What do you do?</label><div className="sport-grid">{SPORT_OPTIONS.map(([key,label])=><button type="button" key={key} className={sports.includes(key)?'selected':''} onClick={()=>toggleSport(key)}>{label}</button>)}</div>
       <p className="profile-helper">Select more than one if you mix sports. Triathlon automatically enables bike, run and swim coaching.</p>
+      <div className="profile-two"><label>Date of birth <span className="optional">recommended</span><input type="date" max={localDateKey()} value={dob} onChange={e=>setDob(e.target.value)}/></label><label>Weight kg <span className="optional">optional</span><input inputMode="decimal" value={weight} onChange={e=>setWeight(e.target.value)}/></label></div>
+      {age!=null&&<p className="detected-estimate">Age {age}{estimatedMaxHr?` · estimated max HR ${estimatedMaxHr} bpm`:''}. {estimatedMaxHr?'This is only a fallback until the coach has a measured, sport-specific or Strava-observed HR value.':'For athletes under 18 the coach does not use an adult age-based max-HR estimate.'}</p>}
+      <label>Experience level<select value={experience} onChange={e=>setExperience(e.target.value)}>{EXPERIENCE_OPTIONS.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label>
       <label>Available training days</label><div className="day-grid">{DAY_OPTIONS.map(([d,n])=><button type="button" key={d} className={days.includes(d)?'selected':''} onClick={()=>toggleDay(d)}>{n}</button>)}</div>
       <label>Preferred long-session day<select value={longDay} onChange={e=>setLongDay(Number(e.target.value))}>{DAY_OPTIONS.filter(([d])=>days.includes(d)).map(([d,n])=><option key={d} value={d}>{n}</option>)}</select></label>
-      <label>Weight kg <span className="optional">optional</span><input inputMode="decimal" value={weight} onChange={e=>setWeight(e.target.value)}/></label>
     </section>
 
     {families.has('cycling')&&<section className="card sport-intensity-card">
@@ -151,7 +161,7 @@ function AthleteDetails({session,profile,sportProfiles,onSaved}){
       <label>Coach uses<select value={cycling.preferred} onChange={e=>setCycling(v=>({...v,preferred:e.target.value}))}>{SOURCE_OPTIONS.cycling.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
       <div className="profile-two"><label>FTP W <span className="optional">optional</span><input inputMode="numeric" value={cycling.ftp} onChange={e=>setCycling(v=>({...v,ftp:e.target.value}))}/></label><label>Threshold HR <span className="optional">optional</span><input inputMode="numeric" value={cycling.threshold_hr} onChange={e=>setCycling(v=>({...v,threshold_hr:e.target.value}))}/></label></div>
       <label>Max cycling HR <span className="optional">optional</span><input inputMode="numeric" value={cycling.max_hr} onChange={e=>setCycling(v=>({...v,max_hr:e.target.value}))}/></label>
-      <p className="profile-helper">No power meter? Leave FTP blank. If HR is available the coach uses HR; otherwise every workout still has an RPE target.</p>
+      <p className="profile-helper">No power meter? Leave FTP blank. If HR is available the coach uses threshold/max/observed HR first, then the DOB estimate if needed; otherwise the workout falls back to RPE.</p>
     </section>}
 
     {families.has('running')&&<section className="card sport-intensity-card">
@@ -164,7 +174,7 @@ function AthleteDetails({session,profile,sportProfiles,onSaved}){
       <p className="profile-helper">Trail and hilly sessions will still show HR/RPE so pace does not force the wrong effort on changing terrain.</p>
     </section>}
 
-    <section className="card profile-form-card"><details><summary>Advanced athlete details</summary>{Object.entries({resting_hr:'Resting HR',max_hr:'General max HR fallback',weekly_hours_target:'Weekly hours target',weekday_session_minutes:'Weekday session minutes',long_session_max_minutes:'Maximum long-session minutes'}).map(([k,label])=><label key={k}>{label}<input inputMode="numeric" value={advanced[k]} onChange={e=>setAdvanced(v=>({...v,[k]:e.target.value}))}/></label>)}</details><p className="profile-helper">Do not know a number? Leave it blank. The coach uses Strava detection and safe fallbacks instead of blocking your plan.</p><button className="primary" disabled={saving||days.length<2||!sports.length} onClick={save}><Save size={17}/>{saving?'Saving…':'Save Athlete Details'}</button>{status&&<p className="form-status">{status}</p>}</section>
+    <section className="card profile-form-card"><details><summary>Advanced athlete details</summary><label>Resting HR <span className="optional">optional</span><input inputMode="numeric" value={advanced.resting_hr} onChange={e=>setAdvanced(v=>({...v,resting_hr:e.target.value}))}/></label><label>General max HR fallback <span className="optional">optional</span><input inputMode="numeric" value={advanced.max_hr} onChange={e=>setAdvanced(v=>({...v,max_hr:e.target.value}))}/></label><label>Weekly hours target <span className="optional">optional</span><input inputMode="decimal" value={advanced.weekly_hours_target} onChange={e=>setAdvanced(v=>({...v,weekly_hours_target:e.target.value}))}/></label><label>Weekday session minutes<input inputMode="numeric" value={advanced.weekday_session_minutes} onChange={e=>setAdvanced(v=>({...v,weekday_session_minutes:e.target.value}))}/></label><label>Maximum long-session minutes<input inputMode="numeric" value={advanced.long_session_max_minutes} onChange={e=>setAdvanced(v=>({...v,long_session_max_minutes:e.target.value}))}/></label><label>Preferred training time <span className="optional">optional</span><input type="time" value={advanced.training_start_time} onChange={e=>setAdvanced(v=>({...v,training_start_time:e.target.value}))}/></label><label>Normal training area <span className="optional">optional</span><input placeholder="e.g. Durbanville" value={advanced.training_location_name} onChange={e=>setAdvanced(v=>({...v,training_location_name:e.target.value}))}/></label><label>Training limitations / notes <span className="optional">optional</span><textarea rows="3" placeholder="Anything the coach should know when planning your training" value={advanced.training_notes} onChange={e=>setAdvanced(v=>({...v,training_notes:e.target.value}))}/></label></details><p className="profile-helper">Do not know a performance number? Leave it blank. The coach prefers measured or observed data and only uses DOB to estimate adult max HR when a better HR value is unavailable.</p><button className="primary" disabled={saving||days.length<2||!sports.length} onClick={save}><Save size={17}/>{saving?'Saving…':'Save Athlete Details'}</button>{status&&<p className="form-status">{status}</p>}</section>
   </div>
 }
 
