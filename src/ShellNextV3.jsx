@@ -52,14 +52,14 @@ export default function ShellNextV3(){
     const nextFuelView=next==='fuel'?normalizeFuelView(options.fuelView||'home'):fuelView;
     setBasketOpen(false);setProfileOpen(false);
     if(next==='home')setHomeView('index');
-    if(next==='training')setTrainingView('plan');
+    if(next==='training')setTrainingView('today');
     if(next==='fuel')setFuelView(nextFuelView);
     applySection(next);
     window.history.pushState({
       ...window.history.state,
       jfSection:next,
       jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,
-      jfTrainingView:next==='training'?'plan':window.history.state?.jfTrainingView,
+      jfTrainingView:next==='training'?'today':window.history.state?.jfTrainingView,
       jfTrainingSubView:next==='training'?null:window.history.state?.jfTrainingSubView,
       jfFuelView:next==='fuel'?nextFuelView:window.history.state?.jfFuelView,
       jfHomeView:next==='home'?'index':window.history.state?.jfHomeView,
@@ -160,17 +160,8 @@ export default function ShellNextV3(){
 }
 
 function TrainingPhaseNav({value,onChange}){
-  const[moreOpen,setMoreOpen]=useState(false);
-  const primary=TRAINING_NAV.filter(item=>item.group==='primary');
-  const secondary=TRAINING_NAV.filter(item=>item.group==='more');
-  const moreActive=secondary.some(item=>item.id===value);
-  useEffect(()=>{setMoreOpen(false)},[value]);
   return <nav className="training-phase2-nav" aria-label="Training pages">
-    {primary.map(item=><button key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}
-    <div className="training-more-wrap">
-      <button type="button" className={moreActive?'active':''} aria-expanded={moreOpen} aria-haspopup="menu" onClick={()=>setMoreOpen(v=>!v)}>More</button>
-      {moreOpen&&<div className="training-more-menu" role="menu">{secondary.map(item=><button type="button" role="menuitem" key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}</div>}
-    </div>
+    {TRAINING_NAV.map(item=><button key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}
   </nav>
 }
 function CurrentAppHeader({count,onBasket,onProfile,profileOpen}){return <header className="current-app-header"><div><div className="current-brand">JUST FUEL</div><div className="current-subbrand">FUEL SMART • TRAIN HARD</div></div><div className="current-header-actions"><button className={`current-profile-button ${profileOpen?'active':''}`} onClick={onProfile} aria-label="Profile and settings"><UserRound size={22}/></button><button className="current-bag-button" onClick={onBasket} aria-label="Open basket"><ShoppingBag size={24}/>{count>0&&<span>{count}</span>}</button></div></header>}

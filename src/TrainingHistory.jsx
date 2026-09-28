@@ -23,9 +23,15 @@ function sportGroup(activity){
   return'other';
 }
 function SportIcon({activity}){return sportGroup(activity)==='cycling'?<Bike size={18}/>:sportGroup(activity)==='running'?<Footprints size={18}/>:<Activity size={18}/>}
+function initialProgressView(){
+  const requested=String(window.history.state?.jfTrainingSubView||'Progress');
+  if(requested==='History')return'activities';
+  if(requested==='Compare')return'review';
+  return'performance';
+}
 
 export default function TrainingHistory({activities=[],loading=false,onRefresh}){
-  const requestedView=window.history.state?.jfTrainingSubView||'History';
+  const[view,setView]=useState(initialProgressView);
   const[filter,setFilter]=useState('all');
   const filtered=useMemo(()=>filter==='all'?activities:activities.filter(a=>sportGroup(a)===filter),[activities,filter]);
   const summary=useMemo(()=>activities.reduce((a,x)=>({
@@ -35,36 +41,49 @@ export default function TrainingHistory({activities=[],loading=false,onRefresh})
     elevation:a.elevation+Number(x.total_elevation_gain_m||0)
   }),{count:0,seconds:0,distance:0,elevation:0}),[activities]);
 
-  if(requestedView==='Performance')return <TrainingPerformance activities={activities} loading={loading} onRefresh={onRefresh}/>;
-  if(requestedView==='Compare')return <TrainingPlanCompare/>;
-
-  return <div className="stack training-history-screen">
-    <section className="card">
-      <div className="row-between"><div><span className="eyebrow">TRAINING HISTORY</span><h2>{summary.count} downloaded activit{summary.count===1?'y':'ies'}</h2></div><button className="icon-btn" onClick={onRefresh} disabled={loading} aria-label="Refresh training history"><RefreshCw size={18}/></button></div>
-      <p className="muted">Everything currently downloaded from Strava, newest first.</p>
-      <div className="two-col">
-        <div><span className="eyebrow">TOTAL TIME</span><h3>{formatDuration(summary.seconds)}</h3></div>
-        <div><span className="eyebrow">DISTANCE</span><h3>{km(summary.distance)}</h3></div>
-      </div>
+  return <div className="stack training-progress-shell">
+    <section className="training-progress-head">
+      <span className="eyebrow">PROGRESS</span>
+      <h2>How your training is going</h2>
+      <p className="muted">Performance first. Open completed activities or planned-versus-actual detail when you need it.</p>
     </section>
 
-    <div className="segmented small">{[['all','All'],['cycling','Cycling'],['running','Run / Walk'],['other','Other']].map(([key,label])=><button key={key} className={filter===key?'active':''} onClick={()=>setFilter(key)}>{label}</button>)}</div>
+    <nav className="training-progress-nav" aria-label="Progress views">
+      <button type="button" className={view==='performance'?'active':''} onClick={()=>setView('performance')}>Performance</button>
+      <button type="button" className={view==='activities'?'active':''} onClick={()=>setView('activities')}>Activities</button>
+      <button type="button" className={view==='review'?'active':''} onClick={()=>setView('review')}>Plan vs actual</button>
+    </nav>
 
-    {loading&&activities.length===0&&<section className="card empty"><Activity size={30}/><p>Loading downloaded training…</p></section>}
-    {!loading&&filtered.length===0&&<section className="card empty"><Activity size={30}/><p>No downloaded training in this filter yet.</p></section>}
+    {view==='performance'&&<TrainingPerformance activities={activities} loading={loading} onRefresh={onRefresh}/>} 
+    {view==='review'&&<TrainingPlanCompare/>}
+    {view==='activities'&&<div className="stack training-history-screen">
+      <section className="card">
+        <div className="row-between"><div><span className="eyebrow">COMPLETED ACTIVITIES</span><h2>{summary.count} downloaded activit{summary.count===1?'y':'ies'}</h2></div><button className="icon-btn" onClick={onRefresh} disabled={loading} aria-label="Refresh training history"><RefreshCw size={18}/></button></div>
+        <p className="muted">Completed activities downloaded from Strava, newest first.</p>
+        <div className="two-col">
+          <div><span className="eyebrow">TOTAL TIME</span><h3>{formatDuration(summary.seconds)}</h3></div>
+          <div><span className="eyebrow">DISTANCE</span><h3>{km(summary.distance)}</h3></div>
+        </div>
+      </section>
 
-    {filtered.map(activity=><section className="card training-history-card" key={activity.id||activity.strava_activity_id}>
-      <div className="row-between"><div><span className="eyebrow">{formatDateTime(activity.start_date_local||activity.start_date)}</span><h3>{activity.name||sportName(activity)}</h3></div><SportIcon activity={activity}/></div>
-      <div className="pill-row"><span>{sportName(activity)}</span>{activity.trainer&&<span>Indoor</span>}{activity.manual&&<span>Manual</span>}{activity.exclude_from_analysis&&<span>Excluded from analysis</span>}</div>
-      <div className="training-history-metrics">
-        {Number(activity.distance_m)>0&&<span><Bike size={15}/><b>{km(activity.distance_m)}</b></span>}
-        {Number(activity.moving_time_s)>0&&<span><Timer size={15}/><b>{formatDuration(activity.moving_time_s)}</b></span>}
-        {Number(activity.total_elevation_gain_m)>0&&<span><Mountain size={15}/><b>{Math.round(Number(activity.total_elevation_gain_m))} m</b></span>}
-        {Number(activity.average_heartrate)>0&&<span><HeartPulse size={15}/><b>{Math.round(Number(activity.average_heartrate))} bpm</b></span>}
-        {Number(activity.average_watts)>0&&<span><Zap size={15}/><b>{Math.round(Number(activity.average_watts))} W</b></span>}
-        {Number(activity.weighted_average_watts)>0&&<span><Zap size={15}/><b>{Math.round(Number(activity.weighted_average_watts))} W weighted</b></span>}
-      </div>
-      <details className="session-more"><summary>Activity details</summary><div className="pill-row session-detail-pills">{Number(activity.max_heartrate)>0&&<span>Max HR {Math.round(Number(activity.max_heartrate))}</span>}{Number(activity.average_cadence)>0&&<span>Cadence {Math.round(Number(activity.average_cadence))}</span>}{Number(activity.kilojoules)>0&&<span>{Math.round(Number(activity.kilojoules))} kJ</span>}{Number(activity.calories)>0&&<span>{Math.round(Number(activity.calories))} kcal</span>}</div><p className="muted">Strava activity #{activity.strava_activity_id}{activity.synced_at?` · downloaded ${formatDateTime(activity.synced_at)}`:''}</p></details>
-    </section>)}
+      <div className="segmented small">{[['all','All'],['cycling','Cycling'],['running','Run / Walk'],['other','Other']].map(([key,label])=><button key={key} className={filter===key?'active':''} onClick={()=>setFilter(key)}>{label}</button>)}</div>
+
+      {loading&&activities.length===0&&<section className="card empty"><Activity size={30}/><p>Loading downloaded training…</p></section>}
+      {!loading&&filtered.length===0&&<section className="card empty"><Activity size={30}/><p>No downloaded training in this filter yet.</p></section>}
+
+      {filtered.map(activity=><section className="card training-history-card" key={activity.id||activity.strava_activity_id}>
+        <div className="row-between"><div><span className="eyebrow">{formatDateTime(activity.start_date_local||activity.start_date)}</span><h3>{activity.name||sportName(activity)}</h3></div><SportIcon activity={activity}/></div>
+        <div className="pill-row"><span>{sportName(activity)}</span>{activity.trainer&&<span>Indoor</span>}{activity.manual&&<span>Manual</span>}{activity.exclude_from_analysis&&<span>Excluded from analysis</span>}</div>
+        <div className="training-history-metrics">
+          {Number(activity.distance_m)>0&&<span><Bike size={15}/><b>{km(activity.distance_m)}</b></span>}
+          {Number(activity.moving_time_s)>0&&<span><Timer size={15}/><b>{formatDuration(activity.moving_time_s)}</b></span>}
+          {Number(activity.total_elevation_gain_m)>0&&<span><Mountain size={15}/><b>{Math.round(Number(activity.total_elevation_gain_m))} m</b></span>}
+          {Number(activity.average_heartrate)>0&&<span><HeartPulse size={15}/><b>{Math.round(Number(activity.average_heartrate))} bpm</b></span>}
+          {Number(activity.average_watts)>0&&<span><Zap size={15}/><b>{Math.round(Number(activity.average_watts))} W</b></span>}
+          {Number(activity.weighted_average_watts)>0&&<span><Zap size={15}/><b>{Math.round(Number(activity.weighted_average_watts))} W weighted</b></span>}
+        </div>
+        <details className="session-more"><summary>Activity details</summary><div className="pill-row session-detail-pills">{Number(activity.max_heartrate)>0&&<span>Max HR {Math.round(Number(activity.max_heartrate))}</span>}{Number(activity.average_cadence)>0&&<span>Cadence {Math.round(Number(activity.average_cadence))}</span>}{Number(activity.kilojoules)>0&&<span>{Math.round(Number(activity.kilojoules))} kJ</span>}{Number(activity.calories)>0&&<span>{Math.round(Number(activity.calories))} kcal</span>}</div><p className="muted">Strava activity #{activity.strava_activity_id}{activity.synced_at?` · downloaded ${formatDateTime(activity.synced_at)}`:''}</p></details>
+      </section>)}
+    </div>}
   </div>;
 }

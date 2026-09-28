@@ -1,6 +1,6 @@
 export const APP_ROUTES={
   home:{id:'home',label:'Home',trainingTab:null},
-  training:{id:'training',label:'Training',trainingTab:'My Plan'},
+  training:{id:'training',label:'Training',trainingTab:'Overview'},
   race:{id:'race',label:'Race',trainingTab:'My Race'},
   fuel:{id:'fuel',label:'Fuel',trainingTab:null},
   shop:{id:'shop',label:'Shop',trainingTab:null}
@@ -9,12 +9,11 @@ export const APP_ROUTES={
 export const BOTTOM_NAV=['home','training','race','fuel','shop'];
 export const MAIN_ROUTE_IDS=BOTTOM_NAV.slice();
 
-// Roadmap V2: keep everyday choices visible and progressively disclose specialist views.
+// Roadmap V2 Phase 3: Training has three everyday destinations only.
 export const TRAINING_NAV=[
+  {id:'today',label:'Today',legacyTab:'Overview',subView:null,group:'primary'},
   {id:'plan',label:'Plan',legacyTab:'My Plan',subView:null,group:'primary'},
-  {id:'history',label:'History',legacyTab:'History',subView:'History',group:'primary'},
-  {id:'performance',label:'Performance',legacyTab:'History',subView:'Performance',group:'more'},
-  {id:'review',label:'Review',legacyTab:'History',subView:'Compare',group:'more'}
+  {id:'progress',label:'Progress',legacyTab:'History',subView:'Progress',group:'primary'}
 ];
 
 export const RACE_NAV=[
@@ -72,14 +71,27 @@ const MAIN_ALIASES={
 
 export function normalizeMainRoute(value){return MAIN_ALIASES[value]||'home'}
 export function trainingTabForRoute(route){return APP_ROUTES[normalizeMainRoute(route)]?.trainingTab||null}
-export function normalizeTrainingLegacy(value){const direct=TRAINING_VIEWS.find(x=>x.legacy===value||x.id===value||x.label===value);if(direct)return direct.legacy;if(value==='My Season')return'My Race';if(value==='Performance'||value==='Review'||value==='Compare')return'History';return'My Plan'}
-export function normalizeTrainingView(value){const aliases={plan:'plan','My Plan':'plan',history:'history',History:'history',performance:'performance',Performance:'performance',review:'review',Review:'review',Compare:'review','Plan vs Actual':'review'};return aliases[value]||'plan'}
+export function normalizeTrainingLegacy(value){const direct=TRAINING_VIEWS.find(x=>x.legacy===value||x.id===value||x.label===value);if(direct)return direct.legacy;if(value==='Today')return'Overview';if(value==='My Season')return'My Race';if(value==='Progress'||value==='Performance'||value==='Review'||value==='Compare'||value==='Plan vs Actual')return'History';return'My Plan'}
+export function normalizeTrainingView(value){
+  const aliases={
+    today:'today',Today:'today',overview:'today',Overview:'today',
+    plan:'plan','My Plan':'plan',
+    progress:'progress',Progress:'progress',history:'progress',History:'progress',performance:'progress',Performance:'progress',review:'progress',Review:'progress',Compare:'progress','Plan vs Actual':'progress'
+  };
+  return aliases[value]||'today';
+}
 export function trainingTargetForView(value){const id=normalizeTrainingView(value);return TRAINING_NAV.find(item=>item.id===id)||TRAINING_NAV[0]}
-export function trainingViewFromState(state={}){if(state?.jfTrainingView)return normalizeTrainingView(state.jfTrainingView);if(state?.jfTrainingTab==='History'){if(state?.jfTrainingSubView==='Performance')return'performance';if(state?.jfTrainingSubView==='Compare')return'review';return'history'}return'plan'}
+export function trainingViewFromState(state={}){
+  if(state?.jfTrainingView)return normalizeTrainingView(state.jfTrainingView);
+  if(state?.jfTrainingTab==='Overview')return'today';
+  if(state?.jfTrainingTab==='My Plan')return'plan';
+  if(state?.jfTrainingTab==='History')return'progress';
+  return'today';
+}
 export function appAreaForTrainingTab(value){const legacy=normalizeTrainingLegacy(value);return TRAINING_VIEWS.find(x=>x.legacy===legacy)?.area||'training'}
 
 export const HOME_INDEX_ITEMS=[
-  {id:'training',title:'Training',copy:'Plan, history, performance and training review.',route:'training'},
+  {id:'training',title:'Training',copy:'Today, your plan and progress in one simple flow.',route:'training'},
   {id:'race',title:'Race',copy:'Your races, race guides, stages, water points and execution.',route:'race'},
   {id:'fuel',title:'Fuel',copy:'Planner, training fuel, reviews, stock and order requirements.',route:'fuel'},
   {id:'shop',title:'Shop',copy:'Browse Just Fuel products and checkout.',route:'shop'}

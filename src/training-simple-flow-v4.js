@@ -16,6 +16,12 @@ function renameTextNode(el,from,to){
 }
 
 function openTab(name){
+  const simpleLabel=name==='Overview'?'Today':name==='My Plan'?'Plan':name==='History'?'Progress':null;
+  if(simpleLabel){
+    const outer=document.querySelector('.training-phase2-nav');
+    const simple=outer&&[...outer.querySelectorAll('button')].find(b=>b.textContent.trim()===simpleLabel);
+    if(simple){simple.click();window.scrollTo({top:0,behavior:'smooth'});return;}
+  }
   const nav=document.querySelector('.training-page .section-nav');
   const btn=nav && [...nav.querySelectorAll('button')].find(b=>b.textContent.trim()===name || (name==='My Season'&&b.dataset.jfOriginalTab==='My Race'));
   if(btn){btn.click();window.scrollTo({top:0,behavior:'smooth'});}
@@ -50,6 +56,8 @@ function enhanceNav(){
     profile.title='Athlete profile';
     profile.innerHTML='<span aria-hidden="true">⚙</span>';
     profile.addEventListener('click',()=>{
+      const shellProfile=document.querySelector('.training-profile-button');
+      if(shellProfile){shellProfile.click();return;}
       const hidden=[...nav.querySelectorAll('button')].find(b=>b.dataset.jfOriginalTab==='My Details');
       if(hidden){hidden.click();window.scrollTo({top:0,behavior:'smooth'});}
     });
@@ -97,7 +105,7 @@ function enhanceDetails(){
     const back=document.createElement('button');
     back.type='button';
     back.className='jf-back-overview';
-    back.textContent='← Back to Overview';
+    back.textContent='← Back to Today';
     back.addEventListener('click',()=>openTab('Overview'));
     const first=main.querySelector('.stack');
     first?.prepend(back);
