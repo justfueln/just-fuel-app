@@ -10,7 +10,11 @@ test('current shell persists auth and does not block first paint on PWA cleanup'
   assert.match(source,/persistSession:\s*true/);
   assert.match(source,/autoRefreshToken:\s*true/);
   assert.match(source,/detectSessionInUrl:\s*true/);
-  assert.match(source,/renderApp\(\);\s*loadEnhancements\(\);/);
+  const render=source.indexOf('renderApp();');
+  const globalEnhancements=source.indexOf('loadGlobalEnhancements();',render);
+  const updateWatcher=source.indexOf('installAppUpdateWatcher();',globalEnhancements);
+  const pwaCleanup=source.indexOf('handOffLegacyWorker().catch',updateWatcher);
+  assert.ok(render>=0&&globalEnhancements>render&&updateWatcher>globalEnhancements&&pwaCleanup>updateWatcher);
   assert.match(source,/PWA_CLEAN_KEY/);
   assert.match(source,/if\(!registrations\.length&&!hasController\)\{[\s\S]*?return false;/);
   const cleanBranch=source.match(/if\(!registrations\.length&&!hasController\)\{([\s\S]*?)return false;/)?.[1]||'';
