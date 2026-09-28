@@ -8,18 +8,18 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Just Fuel" />
-    <link rel="manifest" href="/manifest.webmanifest?v=13" />
+    <link rel="manifest" href="/manifest.webmanifest?v=14" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <title>Just Fuel</title>
     <script>
-      window.__JF_CURRENT_APP_VERSION__='13';
+      window.__JF_CURRENT_APP_VERSION__='14';
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', async () => {
           try {
             const registrations = await navigator.serviceWorker.getRegistrations();
             if (registrations.length || navigator.serviceWorker.controller) {
-              const retirement = await navigator.serviceWorker.register('/sw.js?retire=13', { scope: '/', updateViaCache: 'none' });
+              const retirement = await navigator.serviceWorker.register('/sw.js?retire=14', { scope: '/', updateViaCache: 'none' });
               try { await retirement.update(); } catch {}
               try { retirement.waiting?.postMessage('JF_RETIRE_LEGACY'); } catch {}
             }
@@ -30,6 +30,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx?v=13"></script>
+    <script type="module" src="/src/main.jsx?v=14"></script>
   </body>
 </html>
