@@ -5,6 +5,7 @@ import useWeeklyReminder from './useWeeklyReminder';
 import HomeIndex from './HomeIndex';
 import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, normalizeFuelView, trainingTabForRoute, trainingTargetForView, trainingViewFromState } from './navigation-registry';
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
+import {loadEnhancementsForSection} from './route-enhancements';
 
 const TrainingApp=lazy(()=>import('./App'));
 const RaceApp=lazy(()=>import('./RaceApp'));
@@ -107,6 +108,7 @@ export default function ShellNextV3(){
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
 
+  useEffect(()=>{loadEnhancementsForSection(section)},[section]);
   useEffect(()=>{if(basket.length)localStorage.setItem(BASKET_KEY,JSON.stringify({savedAt:Date.now(),items:basket}));else localStorage.removeItem(BASKET_KEY)},[basket]);
   useEffect(()=>{if(lastBasket.length)localStorage.setItem(LAST_BASKET_KEY,JSON.stringify({savedAt:Date.now(),items:lastBasket}))},[lastBasket]);
   useEffect(()=>{
