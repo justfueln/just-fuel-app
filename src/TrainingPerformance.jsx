@@ -22,6 +22,7 @@ function chooseLoadMode(activities,profile){
   const usable=activities.filter(a=>!a.exclude_from_analysis&&Number(a.moving_time_s)>0);
   if(!usable.length)return'duration';
   const ratio=fn=>usable.filter(fn).length/usable.length;
+  if(ratio(a=>Number(a.raw?.suffer_score)>0&&Boolean(a.raw?.jf_load_source))>=.55)return'jf_load';
   if(Number(profile?.ftp_w)>0&&ratio(a=>Number(a.weighted_average_watts)>0)>=.55)return'power';
   if(ratio(a=>Number(a.raw?.suffer_score)>0)>=.55)return'relative';
   if(Number(profile?.max_hr)>Number(profile?.resting_hr)&&ratio(a=>Number(a.average_heartrate)>0)>=.55)return'hr';
@@ -31,6 +32,10 @@ function sessionLoad(a,profile,mode){
   if(a.exclude_from_analysis)return 0;
   const hours=Math.max(0,Number(a.moving_time_s)||0)/3600;
   if(!hours)return 0;
+  if(mode==='jf_load'){
+    const effort=Number(a.raw?.suffer_score)||0;
+    if(effort>0)return effort;
+  }
   if(mode==='power'){
     const ftp=Number(profile?.ftp_w)||0,np=Number(a.weighted_average_watts)||Number(a.average_watts)||0;
     if(ftp>0&&np>0){const intensity=clamp(np/ftp,.25,1.5);return hours*100*intensity*intensity}
@@ -45,7 +50,7 @@ function sessionLoad(a,profile,mode){
   }
   return hours*50;
 }
-function modeLabel(mode){return mode==='power'?'Estimated from weighted power + FTP':mode==='relative'?'Based on Strava Relative Effort':mode==='hr'?'Estimated from heart rate + duration':'Estimated from training duration'}
+function modeLabel(mode){return mode==='jf_load'?'Just Fuel load from power, heart rate, pace or duration':mode==='power'?'Estimated from weighted power + FTP':mode==='relative'?'Based on Strava Relative Effort':mode==='hr'?'Estimated from heart rate + duration':'Estimated from training duration'}
 
 function buildDaily(activities,profile,mode){
   const today=new Date();today.setHours(0,0,0,0);

@@ -7,6 +7,7 @@ const apiUrl=new URL('../src/training-api.js',import.meta.url);
 const mainUrl=new URL('../src/main.jsx',import.meta.url);
 const targetsUrl=new URL('../src/training-multisport-targets-v1.js',import.meta.url);
 const detailsUrl=new URL('../src/training-workout-details.js',import.meta.url);
+const performanceUrl=new URL('../src/TrainingPerformance.jsx',import.meta.url);
 
 test('athlete profile supports cycling running triathlon and hyrox without requiring FTP',async()=>{
   const source=await readFile(profileUrl,'utf8');
@@ -25,10 +26,14 @@ test('fuel training uses the sport-aware fuel plan',async()=>{
 
 test('training history and performance use universal backend load',async()=>{
   const source=await readFile(apiUrl,'utf8');
+  const performance=await readFile(performanceUrl,'utf8');
   assert.match(source,/from\('training_activity_metrics'\)/);
   assert.match(source,/estimated_training_load/);
   assert.match(source,/jf_load_source/);
   assert.match(source,/suffer_score:Number\(row\.estimated_training_load\)/);
+  assert.match(performance,/return'jf_load'/);
+  assert.match(performance,/mode==='jf_load'/);
+  assert.match(performance,/Just Fuel load from power, heart rate, pace or duration/);
 });
 
 test('Strava sync refreshes sensor detection and workout targets',async()=>{
