@@ -23,6 +23,14 @@ test('fuel training uses the sport-aware fuel plan',async()=>{
   assert.match(source,/fuel_delivery_mode/);
 });
 
+test('training history and performance use universal backend load',async()=>{
+  const source=await readFile(apiUrl,'utf8');
+  assert.match(source,/from\('training_activity_metrics'\)/);
+  assert.match(source,/estimated_training_load/);
+  assert.match(source,/jf_load_source/);
+  assert.match(source,/suffer_score:Number\(row\.estimated_training_load\)/);
+});
+
 test('Strava sync refreshes sensor detection and workout targets',async()=>{
   const source=await readFile(apiUrl,'utf8');
   assert.match(source,/refresh_training_sport_detection/);
