@@ -55,11 +55,13 @@ async function load(force=false){
 function metric(label,value){const d=el('div','jf-race-week-metric');d.append(el('b','',String(value)),el('span','',label));return d}
 function fuelStat(label,value){const d=el('span','');d.append(el('b','',String(Math.max(0,Number(value)||0))),document.createTextNode(label));return d}
 
-function render(data,host){
-  host.querySelector('.jf-race-week')?.remove();
-  if(!data?.race)return;
+function render(data,host,force=false){
+  const existing=host.querySelector('.jf-race-week');
+  if(!data?.race){existing?.remove();return}
+  if(existing?.dataset.raceGoalId===String(data.race.race_goal_id)&&!force)return;
+  existing?.remove();
   const{race,prep,fuel,sessions}=data;
-  const card=el('section','jf-race-week');
+  const card=el('section','jf-race-week');card.dataset.raceGoalId=String(race.race_goal_id);
   const head=el('div','jf-race-week-head');
   const headCopy=el('div','');headCopy.append(el('span','jf-race-week-kicker',Number(race.days_to_event)<=7?'RACE WEEK':'RACE EXECUTION'),el('h3','',race.event_name),el('p','',`${fmtDate(race.event_date)} · A race · ${race.days_to_event===0?'Race day':`${race.days_to_event} day${Number(race.days_to_event)===1?'':'s'} to go`}`));
   const count=el('div','jf-race-week-count',String(race.days_to_event));count.append(el('small','',race.days_to_event===0?'TODAY':'DAYS'));
@@ -88,15 +90,16 @@ function render(data,host){
 
   const checks=loadChecks(race.race_goal_id);const checkBlock=el('div','jf-race-week-block');checkBlock.append(el('span','jf-race-week-label','RACE-DAY CHECKLIST'));
   const checkList=el('div','jf-race-week-checks');
+  const progressText=el('div','jf-race-week-ready-text');
   function updateProgress(){const done=CHECKS.filter(([id])=>checks[id]).length;progressText.textContent=`${done}/${CHECKS.length} ready`;card.classList.toggle('jf-race-week-ready',done===CHECKS.length)}
   for(const[id,label]of CHECKS){const button=el('button',checks[id]?'done':'');button.type='button';const mark=el('span','jf-race-week-check',checks[id]?'✓':'');button.append(mark,el('strong','',label));button.addEventListener('click',()=>{checks[id]=!checks[id];saveChecks(race.race_goal_id,checks);button.classList.toggle('done',checks[id]);mark.textContent=checks[id]?'✓':'';updateProgress();window.jfTrack?.('race_week_checklist_toggle',{item:id,checked:checks[id]},'race')});checkList.append(button)}
-  const progressText=el('div','jf-race-week-ready-text');checkBlock.append(checkList,progressText);card.append(checkBlock);updateProgress();
+  checkBlock.append(checkList,progressText);card.append(checkBlock);updateProgress();
 
   const heading=host.querySelector('.race-v2-heading');if(heading?.nextSibling)host.insertBefore(card,heading.nextSibling);else host.prepend(card);
   window.jfTrack?.('race_week_execution_view',{race_goal_id:race.race_goal_id,days_to_race:race.days_to_event},'race');
 }
 
-async function scan(force=false){const host=document.querySelector('.race-v2-list');if(!host)return;const data=await load(force);render(data,host)}
+async function scan(force=false){const host=document.querySelector('.race-v2-list');if(!host)return;const data=await load(force);render(data,host,force)}
 function queue(force=false){if(queued)return;queued=true;setTimeout(()=>{queued=false;scan(force).catch(()=>{})},160)}
 if(typeof window!=='undefined'){
   window.addEventListener('popstate',()=>queue());
