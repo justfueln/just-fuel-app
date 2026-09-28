@@ -7,6 +7,7 @@ import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, normalizeFuelView, trainingTabFor
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
 
 const TrainingApp=lazy(()=>import('./App'));
+const RaceApp=lazy(()=>import('./RaceApp'));
 const CheckoutDrawer=lazy(()=>import('./CheckoutDrawer'));
 const FuelHubV2=lazy(()=>import('./FuelHubV2'));
 const ProfileHub=lazy(()=>import('./ProfileHub'));
@@ -147,7 +148,8 @@ export default function ShellNextV3(){
           {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
           {section==='training'&&<TrainingPhaseNav value={trainingView} onChange={openTrainingView}/>} 
           {section==='fuel'&&<FuelHubV2 addLine={addLine} openBasket={openBasket} viewTarget={fuelView} onViewChange={setFuelView}/>} 
-          {isTrainingArea&&<TrainingApp key={`${section}-${section==='training'?trainingView:'root'}`}/>} 
+          {section==='training'&&<TrainingApp key={`training-${trainingView}`}/>} 
+          {section==='race'&&<RaceApp/>}
         </>}
       </Suspense>
     </div>
