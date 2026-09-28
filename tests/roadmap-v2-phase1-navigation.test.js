@@ -12,14 +12,14 @@ test('bottom navigation remains Home, Training, Race, Fuel, Shop',async()=>{
   assert.match(source,/BOTTOM_NAV=\['home','training','race','fuel','shop'\]/);
 });
 
-test('Training exposes two direct choices plus one More control',async()=>{
+test('Training keeps a small direct navigation surface',async()=>{
   const registry=await import(`${registryUrl.href}?phase1=${Date.now()}`);
-  assert.equal(registry.TRAINING_NAV.filter(x=>x.group==='primary').length,2);
-  assert.equal(registry.TRAINING_NAV.filter(x=>x.group==='more').length,2);
+  assert.deepEqual(registry.TRAINING_NAV.filter(x=>x.group==='primary').map(x=>x.id),['today','plan','progress']);
+  assert.equal(registry.TRAINING_NAV.filter(x=>x.group==='more').length,0);
   const shell=await readFile(shellUrl,'utf8');
-  assert.match(shell,/training-more-wrap/);
-  assert.match(shell,/aria-haspopup="menu"/);
-  assert.match(shell,/>More<\/button>/);
+  assert.match(shell,/aria-label="Training pages"/);
+  assert.doesNotMatch(shell,/training-more-menu/);
+  assert.doesNotMatch(shell,/>More<\/button>/);
 });
 
 test('Fuel exposes Quick Planner and Training Fuel directly, with secondary tools behind More',async()=>{
