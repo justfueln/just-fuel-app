@@ -7,6 +7,18 @@ let scanQueued=false,loading=null,cacheAt=0,sessionRows=[],feedbackMap=new Map()
 
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n}
+function coachSummary(result){
+  const d=result?.decision||{};
+  const s=result?.schedule||{};
+  if(!d?.ok)return'Feedback saved';
+  let text='Feedback saved';
+  if(d.decision==='reduce')text=`Saved · next session adjusted${d.adjusted_minutes?` to ${Math.round(Number(d.adjusted_minutes))} min`:''}`;
+  else if(d.decision==='fuel_review')text='Saved · training stays on plan; fuel strategy flagged for review';
+  else if(d.decision==='recovery_review')text='Saved · recovery review added before the next quality session';
+  else if(d.decision==='keep')text='Saved · next session stays as planned';
+  if(s?.status==='pending')text+=' · schedule suggestion ready';
+  return text;
+}
 
 async function load(force=false){
   if(!force&&sessionRows.length&&Date.now()-cacheAt<60000)return{rows:sessionRows,feedback:feedbackMap};
@@ -39,9 +51,11 @@ async function saveFeedback(row,feel,flags=[]){
   try{const result=await sb.rpc('refresh_training_progression',{p_user_id:session.user.id});progression=result.data||null}catch{}
   try{const result=await sb.rpc('refresh_next_training_coach_decision',{p_user_id:session.user.id});decision=result.data||null}catch{}
   try{const result=await sb.rpc('refresh_training_schedule_suggestion',{p_user_id:session.user.id});schedule=result.data||null}catch{}
-  window.jfTrack?.('workout_feedback_saved',{},'training');
-  window.dispatchEvent(new CustomEvent('jf-training-feedback-saved',{detail:{sessionId:row.id,adaptation,progression,decision,schedule}}));
+  const detail={sessionId:row.id,adaptation,progression,decision,schedule};
+  window.jfTrack?.('workout_feedback_saved',{feel,flags_count:flags.length,coach_decision:decision?.decision||'none'},'training');
+  window.dispatchEvent(new CustomEvent('jf-training-feedback-saved',{detail}));
   window.dispatchEvent(new CustomEvent('jf-training-plan-updated',{detail:{source:'feedback',adaptation,progression,decision,schedule}}));
+  return detail;
 }
 
 function addFeedback(card,row,existing){
@@ -64,8 +78,8 @@ function addFeedback(card,row,existing){
     flagWrap.hidden=!selectedFeel;
   }
   async function persist(){
-    if(!selectedFeel)return;status.textContent='Saving…';
-    try{await saveFeedback(row,selectedFeel,flags);status.textContent='Saved · coach refreshed';setTimeout(()=>status.textContent='Feedback saved',1400)}
+    if(!selectedFeel)return;status.textContent='Saving and checking your next session…';
+    try{const result=await saveFeedback(row,selectedFeel,flags);status.textContent=coachSummary(result)}
     catch(e){status.textContent=e?.message||'Could not save'}
   }
 
