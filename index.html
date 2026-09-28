@@ -4,17 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0b0b" />
-    <meta name="description" content="Just Fuel fuel planner, shop, training and race app" />
+    <meta name="description" content="Just Fuel training, race, fueling and ordering app" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Just Fuel" />
-    <link rel="manifest" href="/manifest.webmanifest?v=11" />
+    <link rel="manifest" href="/manifest.webmanifest?v=13" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <title>Just Fuel</title>
+    <script>
+      window.__JF_CURRENT_APP_VERSION__='13';
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', async () => {
+          try {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            if (registrations.length || navigator.serviceWorker.controller) {
+              const retirement = await navigator.serviceWorker.register('/sw.js?retire=13', { scope: '/', updateViaCache: 'none' });
+              try { await retirement.update(); } catch {}
+              try { retirement.waiting?.postMessage('JF_RETIRE_LEGACY'); } catch {}
+            }
+          } catch {}
+        }, { once: true });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx?v=11"></script>
+    <script type="module" src="/src/main.jsx?v=13"></script>
   </body>
 </html>
