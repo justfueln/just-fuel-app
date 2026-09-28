@@ -6,6 +6,7 @@ const profileUrl=new URL('../src/ProfileHub.jsx',import.meta.url);
 const apiUrl=new URL('../src/training-api.js',import.meta.url);
 const mainUrl=new URL('../src/main.jsx',import.meta.url);
 const targetsUrl=new URL('../src/training-multisport-targets-v1.js',import.meta.url);
+const detailsUrl=new URL('../src/training-workout-details.js',import.meta.url);
 
 test('athlete profile supports cycling running triathlon and hyrox without requiring FTP',async()=>{
   const source=await readFile(profileUrl,'utf8');
@@ -40,4 +41,12 @@ test('workout cards can display power heart rate pace or RPE targets',async()=>{
   for(const metric of ["metric==='power'","metric==='heart_rate'","metric==='pace'","target_rpe_low"])assert.ok(source.includes(metric),`missing ${metric}`);
   assert.match(source,/\/km/);
   assert.match(source,/bpm/);
+});
+
+test('expanded workout details prefer sport-aware target text and show hydration guidance',async()=>{
+  const source=await readFile(detailsUrl,'utf8');
+  assert.match(source,/s\.targetText\|\|/);
+  assert.match(source,/secondary_target_text/);
+  assert.match(source,/hydration_ml_per_hour/);
+  assert.match(source,/sodium_target_mg_per_hour/);
 });
