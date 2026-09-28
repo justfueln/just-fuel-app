@@ -64,7 +64,7 @@ import './race-goal-progress-v1';
 import './race-fuel-rehearsal-v1';
 import './app-analytics';
 
-const CURRENT_APP_VERSION='15';
+const CURRENT_APP_VERSION='16';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -106,7 +106,7 @@ async function handOffLegacyWorker(){
   if(!registrations.length&&!hasController) return false;
 
   try{
-    const retirement=await navigator.serviceWorker.register('/sw.js?retire=15',{
+    const retirement=await navigator.serviceWorker.register('/sw.js?retire=16',{
       scope:'/',
       updateViaCache:'none'
     });
@@ -116,7 +116,7 @@ async function handOffLegacyWorker(){
 
     window.setTimeout(async()=>{
       await deleteLegacyCaches();
-      const current=new URL('/current',window.location.origin);
+      const current=new URL('/',window.location.origin);
       current.searchParams.set('jfapp',CURRENT_APP_VERSION);
       current.searchParams.set('legacy','cleared');
       current.searchParams.set('fallback','1');
@@ -144,7 +144,7 @@ function renderApp(){
 async function boot(){
   const handingOff=await handOffLegacyWorker();
   if(handingOff) return;
-  try{document.cookie='jf_shell_v15=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
+  try{document.cookie='jf_shell_v16=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
   renderApp();
 }
 

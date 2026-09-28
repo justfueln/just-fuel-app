@@ -1,8 +1,8 @@
-// Just Fuel emergency legacy-PWA retirement worker — v15.
+// Just Fuel emergency legacy-PWA retirement worker — v16.
 // This worker never serves app content. Its only job is to take control away
 // from any older worker that cached the retired white application shell.
-const CURRENT_APP_VERSION = '15';
-const CURRENT_URL = `/current?jfapp=${CURRENT_APP_VERSION}&legacy=cleared`;
+const CURRENT_APP_VERSION = '16';
+const CURRENT_URL = `/?jfapp=${CURRENT_APP_VERSION}&legacy=cleared`;
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
@@ -10,9 +10,6 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
-    // Take control of every currently open Just Fuel window first. This is the
-    // key step: unregistering an old worker alone does not release an already
-    // controlled Android/PWA window.
     try { await self.clients.claim(); } catch {}
 
     try {
@@ -27,10 +24,6 @@ self.addEventListener('activate', event => {
         return client.navigate(`${CURRENT_URL}${join}t=${Date.now()}`).catch(() => null);
       }));
     } catch {}
-
-    // Deliberately remain registered until the v15 app loads. The v15 boot
-    // code unregisters this worker after it is safely on /current. Until then,
-    // an older app-shell worker cannot regain control.
   })());
 });
 

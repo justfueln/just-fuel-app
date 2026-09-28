@@ -8,20 +8,20 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Just Fuel" />
-    <link rel="manifest" href="/manifest.webmanifest?v=15" />
+    <link rel="manifest" href="/manifest.webmanifest?v=16" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <title>Just Fuel</title>
     <script>
-      window.__JF_CURRENT_APP_VERSION__='15';
+      window.__JF_CURRENT_APP_VERSION__='16';
       if ('serviceWorker' in navigator) {
         (async () => {
           try {
             const url = new URL(window.location.href);
-            const cleared = url.searchParams.get('legacy') === 'cleared' && url.searchParams.get('jfapp') === '15';
+            const cleared = url.searchParams.get('legacy') === 'cleared' && url.searchParams.get('jfapp') === '16';
             const registrations = await navigator.serviceWorker.getRegistrations();
             if (!cleared && (registrations.length || navigator.serviceWorker.controller)) {
-              const retirement = await navigator.serviceWorker.register('/sw.js?retire=15', { scope: '/', updateViaCache: 'none' });
+              const retirement = await navigator.serviceWorker.register('/sw.js?retire=16', { scope: '/', updateViaCache: 'none' });
               try { await retirement.update(); } catch {}
               try { retirement.waiting?.postMessage('JF_FORCE_ACTIVATE'); } catch {}
               try { retirement.installing?.postMessage('JF_FORCE_ACTIVATE'); } catch {}
@@ -33,6 +33,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx?v=15"></script>
+    <script type="module" src="/src/main.jsx?v=16"></script>
   </body>
 </html>
