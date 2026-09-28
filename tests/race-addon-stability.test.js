@@ -7,9 +7,9 @@ const guardUrl=new URL('../src/race-addon-stability.js',import.meta.url);
 
 test('Race mutation guard loads before the two legacy Race add-ons',async()=>{
   const source=await readFile(mainUrl,'utf8');
-  const guard=source.indexOf("import './race-addon-stability'");
-  const progress=source.indexOf("import './race-goal-progress-v1'");
-  const rehearsal=source.indexOf("import './race-fuel-rehearsal-v1'");
+  const guard=source.indexOf("import('./race-addon-stability')");
+  const progress=source.indexOf("import('./race-goal-progress-v1')");
+  const rehearsal=source.indexOf("import('./race-fuel-rehearsal-v1')");
   assert.ok(guard>=0);
   assert.ok(progress>guard);
   assert.ok(rehearsal>guard);
