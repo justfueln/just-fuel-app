@@ -29,6 +29,7 @@ import './navigation-v1.css';
 import './navigation-v2.css';
 import './race-hub-v2.css';
 import './race-hub-v2-bridge.css';
+import './race-week-execution-v1.css';
 import './fuel-hub-v2.css';
 import './profile-hub-v1.css';
 import './mobile-ux-audit-v1.css';
@@ -62,6 +63,7 @@ import './training-power-curve-v1';
 import './training-achievements-v1';
 import './race-goal-progress-v1';
 import './race-fuel-rehearsal-v1';
+import './race-week-execution-v1';
 import './app-analytics';
 
 const CURRENT_APP_VERSION='16';
