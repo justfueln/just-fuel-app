@@ -1,8 +1,8 @@
-// Just Fuel legacy PWA retirement worker — v13.
+// Just Fuel legacy PWA retirement worker — v14.
 // The current application deliberately does not use an app-shell service worker.
 // If an older installed PWA still has a worker/caches, force them out and
 // navigate every open client back to the current network-served application.
-const CURRENT_APP_VERSION = '13';
+const CURRENT_APP_VERSION = '14';
 
 self.addEventListener('install', event => {
   event.waitUntil(self.skipWaiting());
