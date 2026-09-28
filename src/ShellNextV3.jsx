@@ -156,9 +156,22 @@ export default function ShellNextV3(){
 
     {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>}
     {basketOpen&&<Suspense fallback={null}><CheckoutDrawer open close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/></Suspense>}
-  </div>
+  </div>;
 }
 
-function TrainingPhaseNav({value,onChange}){return <nav className="training-phase2-nav" aria-label="Training pages">{TRAINING_NAV.map(item=><button key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}</nav>}
+function TrainingPhaseNav({value,onChange}){
+  const[moreOpen,setMoreOpen]=useState(false);
+  const primary=TRAINING_NAV.filter(item=>item.group==='primary');
+  const secondary=TRAINING_NAV.filter(item=>item.group==='more');
+  const moreActive=secondary.some(item=>item.id===value);
+  useEffect(()=>{setMoreOpen(false)},[value]);
+  return <nav className="training-phase2-nav" aria-label="Training pages">
+    {primary.map(item=><button key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}
+    <div className="training-more-wrap">
+      <button type="button" className={moreActive?'active':''} aria-expanded={moreOpen} aria-haspopup="menu" onClick={()=>setMoreOpen(v=>!v)}>More</button>
+      {moreOpen&&<div className="training-more-menu" role="menu">{secondary.map(item=><button type="button" role="menuitem" key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}</div>}
+    </div>
+  </nav>
+}
 function CurrentAppHeader({count,onBasket,onProfile,profileOpen}){return <header className="current-app-header"><div><div className="current-brand">JUST FUEL</div><div className="current-subbrand">FUEL SMART • TRAIN HARD</div></div><div className="current-header-actions"><button className={`current-profile-button ${profileOpen?'active':''}`} onClick={onProfile} aria-label="Profile and settings"><UserRound size={22}/></button><button className="current-bag-button" onClick={onBasket} aria-label="Open basket"><ShoppingBag size={24}/>{count>0&&<span>{count}</span>}</button></div></header>}
 function HomeSubpageHead({title,onBack}){return <div className="home-subpage-head"><button onClick={onBack} aria-label="Back to Home"><ArrowLeft size={20}/></button><div><span>HOME</span><strong>{title}</strong></div></div>}
