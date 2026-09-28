@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0b0b" />
+  <title>Just Fuel</title>
+</head>
+<body style="margin:0;background:#080808;color:#f6f1e7;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;display:grid;place-items:center;min-height:100vh">
+  <div>Opening Just Fuel…</div>
+  <script>
+    const target = new URL('/', window.location.origin);
+    const incoming = new URLSearchParams(window.location.search);
+    incoming.forEach((value, key) => target.searchParams.set(key, value));
+    target.searchParams.set('jfapp', '16');
+    target.searchParams.set('legacy', 'cleared');
+    target.searchParams.set('t', String(Date.now()));
+    window.location.replace(target.toString());
+  </script>
+</body>
+</html>
