@@ -63,8 +63,8 @@ export async function fetchFuelTrainingPlan(client,userId){
   if(!activePlanId)return{plan:[],error:null};
   const today=new Date(),p=n=>String(n).padStart(2,'0');
   const todayKey=`${today.getFullYear()}-${p(today.getMonth()+1)}-${p(today.getDate())}`;
-  const result=await client.from('training_session_fuel_plan')
-    .select('session_id,plan_id,session_date,title,duration_minutes,status,carb_target_gph,bottle_mix_sachets,regular_gels,boost_gels,recover_servings')
+  const result=await client.from('training_session_fuel_plan_multisport')
+    .select('session_id,plan_id,session_date,sport_type,title,duration_minutes,status,carb_target_gph,bottle_mix_sachets,regular_gels,boost_gels,recover_servings,hydration_ml_per_hour,hydration_ml_total,sodium_target_mg_per_hour,fuel_delivery_mode,fueling_note,hydration_note')
     .eq('user_id',userId)
     .eq('plan_id',activePlanId)
     .gte('session_date',todayKey)
@@ -96,10 +96,6 @@ export async function fetchTrainingFuelForecast(client,userId){
 }
 
 export async function fetchTrainingHistory(client,userId){
-  // Always read the deduplicated analysis view. It is security_invoker=true,
-  // so the underlying Strava RLS still limits every athlete to their own rows.
-  // Effective metrics merge useful values from a recognised duplicate into the
-  // canonical activity without ever returning the duplicate as a second ride.
   const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,effective_average_heartrate,effective_max_heartrate,effective_average_cadence,effective_average_watts,effective_weighted_average_watts,effective_kilojoules,effective_calories,trainer,manual,had_duplicate,duplicate_confidence,synced_at';
   const rows=[];
   const pageSize=500;
@@ -132,6 +128,17 @@ export async function verifyTrainingOtp(client,email,token){
 
 export async function syncTrainingStrava(client){
   const result=await client.functions.invoke('strava-sync',{body:{}});
+  if(!result.error){
+    try{
+      const auth=await client.auth.getSession();
+      const uid=auth.data.session?.user?.id;
+      if(uid){
+        const detection=await client.rpc('refresh_training_sport_detection',{p_user_id:uid});
+        const targets=await client.rpc('refresh_training_session_targets',{p_user_id:uid});
+        result.data={...(result.data||{}),sport_detection:detection.data||null,sport_detection_warning:detection.error?.message||null,session_targets:targets.data||null,session_targets_warning:targets.error?.message||null};
+      }
+    }catch{}
+  }
   if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('jf-strava-synced',{detail:result?.data||null}));
   return result;
 }
