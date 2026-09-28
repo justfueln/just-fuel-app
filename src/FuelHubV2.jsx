@@ -13,6 +13,7 @@ const mins=v=>{const n=Math.max(0,Math.round(Number(v)||0)),h=Math.floor(n/60),m
 const todayKey=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const addDays=days=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);const p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const n=v=>Math.max(0,Number(v)||0);
+const deliveryLabel=value=>({bottle_first:'Bottle-first',gels_first:'Gels-first',brick_split:'Bike bottles + run gels',session_support:'Hydration + recovery',poolside:'Poolside',mixed:'Mixed'}[String(value||'')]||'Balanced');
 const friendlyFuelError=error=>{
   if(!error)return'';
   const text=String(error.message||error);
@@ -104,7 +105,7 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
 
   if(view==='planner')return <FuelPageFrame title="Quick Fuel Planner" subtitle="Build a simple session fuel plan." onBack={back}><FuelBuilder addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
   if(view==='review')return <FuelPageFrame title="Fuel Review" subtitle="Compare planned fuel with what you actually used." onBack={back}><TrainingFuelReview/></FuelPageFrame>;
-  if(view==='training')return <FuelPageFrame title="Training Fuel" subtitle="What your upcoming training requires." onBack={back}><TrainingFuel plan={futurePlan} fuelProfile={fuelProfile} userId={session?.user?.id} reload={loadAll} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
+  if(view==='training')return <FuelPageFrame title="Training Fuel" subtitle="Sport-aware fuel, hydration and recovery for upcoming training." onBack={back}><TrainingFuel plan={futurePlan} fuelProfile={fuelProfile} userId={session?.user?.id} reload={loadAll} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
   if(view==='stock')return <FuelPageFrame title="My Stock" subtitle="Keep your cupboard stock up to date." onBack={back}><StockPage session={session} stock={stock} reload={loadAll}/></FuelPageFrame>;
   if(view==='order')return <FuelPageFrame title="Order Needed" subtitle="Only the shortfall for your selected training horizon." onBack={back}><OrderNeeded forecast={forecastReady?forecast:[]} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
 
@@ -120,7 +121,7 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
     {session?.user&&<section className="card fuel-v2-summary">
       <div><span className="eyebrow">NEXT 7 DAYS</span><h3>{week.length} planned session{week.length===1?'':'s'}</h3></div>
       <div className="fuel-v2-summary-grid">
-        <span><b>{weekTotals.mix}</b>Bottle Mix</span><span><b>{weekTotals.regular+weekTotals.boost}</b>Total gels</span><span><b>{weekTotals.boost}</b>Boost</span><span><b>{weekTotals.recover}</b>Recover</span>
+        <span><b>{weekTotals.mix}</b>Bottle Mix</span><span><b>{weekTotals.regular+weekTotals.boost}</b>Total gels</span><span><b>{weekTotals.hydrate}</b>Hydrate</span><span><b>{weekTotals.recover}</b>Recover</span>
       </div>
       {!forecastReady?<div className="fuel-v2-stock-callout needs-order"><RefreshCw size={19}/><div><strong>{loading?'Updating stock forecast…':'Stock forecast not loaded'}</strong><small>{loading?'This should only take a moment.':'Tap refresh to try again.'}</small></div></div>:<div className={`fuel-v2-stock-callout ${shortfallUnits?'needs-order':'ready'}`}><PackageCheck size={19}/><div><strong>{shortfallUnits?`${shortfallUnits} unit${shortfallUnits===1?'':'s'} short`:'Stock covers the 7-day forecast'}</strong><small>{shortfallUnits?'Open Order Needed to see the exact shortfall.':'Keep My Stock updated for accurate forecasting.'}</small></div></div>}
     </section>}
@@ -141,7 +142,7 @@ function FuelMenuCard({item,onClick,locked}){
 
 function FuelPageFrame({title,subtitle,onBack,children}){return <div className="fuel-v2-page"><div className="fuel-v2-topbar"><button onClick={onBack} aria-label="Back to Fuel"><ArrowLeft size={20}/></button><div><span>FUEL</span><strong>{title}</strong><small>{subtitle}</small></div></div>{children}</div>}
 
-function tallySessions(rows){return rows.reduce((a,s)=>({mix:a.mix+n(s.bottle_mix_sachets),regular:a.regular+n(s.regular_gels),boost:a.boost+n(s.boost_gels),recover:a.recover+n(s.recover_servings)}),{mix:0,regular:0,boost:0,recover:0})}
+function tallySessions(rows){return rows.reduce((a,s)=>({mix:a.mix+n(s.bottle_mix_sachets),regular:a.regular+n(s.regular_gels),boost:a.boost+n(s.boost_gels),hydrate:a.hydrate+n(s.hydrate_servings),recover:a.recover+n(s.recover_servings)}),{mix:0,regular:0,boost:0,hydrate:0,recover:0})}
 
 function TrainingFuel({plan,fuelProfile,userId,reload,addLine,openBasket}){
   const[horizon,setHorizon]=useState(7),[saving,setSaving]=useState(false),[status,setStatus]=useState('');
@@ -155,12 +156,12 @@ function TrainingFuel({plan,fuelProfile,userId,reload,addLine,openBasket}){
     if(result.error)setStatus(result.error.message);else{setStatus(value==='auto'?'Auto targets restored.':'Manual carb target saved.');await reload(userId)}
     setSaving(false);
   }
-  function addSession(session){addFuelLines(addLine,{mix:n(session.bottle_mix_sachets),regular:n(session.regular_gels),boost:n(session.boost_gels),recover:n(session.recover_servings)});openBasket()}
-  function addAll(){addFuelLines(addLine,totals);openBasket()}
+  function addSession(session){addFuelLines(addLine,{mix:n(session.bottle_mix_sachets),regular:n(session.regular_gels),boost:n(session.boost_gels),hydrate:hydratePacks(n(session.hydrate_servings)),recover:n(session.recover_servings)});openBasket()}
+  function addAll(){addFuelLines(addLine,{...totals,hydrate:hydratePacks(totals.hydrate)});openBasket()}
   return <div className="stack fuel-v2-training">
-    <section className="card"><span className="eyebrow">CARB STRATEGY</span><h3>How should Just Fuel calculate training fuel?</h3><div className="fuel-v2-strategy">{['auto',50,60,90,120].map(value=><button key={value} disabled={saving} className={strategy===String(value)?'active':''} onClick={()=>saveStrategy(value)}><b>{value==='auto'?'Auto':value}</b><small>{value==='auto'?'Session based':'g/h'}</small></button>)}</div>{status&&<p className="form-status">{status}</p>}</section>
-    <section className="card"><div className="row-between"><div><span className="eyebrow">TRAINING REQUIREMENT</span><h3>What your plan needs</h3></div><Fuel size={22}/></div><div className="segmented fuel-v2-horizon">{[7,14,30].map(d=><button key={d} className={horizon===d?'active':''} onClick={()=>setHorizon(d)}>{d} days</button>)}</div><div className="fuel-v2-summary-grid"><span><b>{rows.length}</b>Sessions</span><span><b>{totals.mix}</b>Bottle Mix</span><span><b>{totals.regular+totals.boost}</b>Gels</span><span><b>{totals.recover}</b>Recover</span></div><button className="primary fuel-v2-wide" disabled={!rows.length} onClick={addAll}><ShoppingBag size={17}/>Add {horizon}-day training fuel</button></section>
-    {rows.length?rows.map(s=><section className="card fuel-v2-session" key={s.id}><div className="row-between"><div><span className="eyebrow">{fmtDate(s.session_date)}</span><h3>{s.title}</h3></div><strong className="fuel-v2-gph">{n(s.carb_target_gph)} g/h</strong></div><p className="muted">{mins(s.duration_minutes)}</p><div className="fuel-v2-session-grid"><span><b>{n(s.bottle_mix_sachets)}</b>Mix</span><span><b>{n(s.regular_gels)}</b>Gels</span><span><b>{n(s.boost_gels)}</b>Boost</span><span><b>{n(s.recover_servings)}</b>Recover</span></div><button className="secondary fuel-v2-wide" onClick={()=>addSession(s)}>Add this session</button></section>):<section className="card empty"><Fuel size={26}/><p>No upcoming training sessions in this horizon.</p></section>}
+    <section className="card"><span className="eyebrow">CARB STRATEGY</span><h3>How should Just Fuel calculate training fuel?</h3><div className="fuel-v2-strategy">{['auto',50,60,90,120].map(value=><button key={value} disabled={saving} className={strategy===String(value)?'active':''} onClick={()=>saveStrategy(value)}><b>{value==='auto'?'Auto':value}</b><small>{value==='auto'?'Sport + session':'g/h'}</small></button>)}</div><p className="muted">Auto adapts to sport, session type and duration and caps at 90 g/h. 120 g/h remains an advanced manual target.</p>{status&&<p className="form-status">{status}</p>}</section>
+    <section className="card"><div className="row-between"><div><span className="eyebrow">TRAINING REQUIREMENT</span><h3>What your plan needs</h3></div><Fuel size={22}/></div><div className="segmented fuel-v2-horizon">{[7,14,30].map(d=><button key={d} className={horizon===d?'active':''} onClick={()=>setHorizon(d)}>{d} days</button>)}</div><p className="muted">{rows.length} planned session{rows.length===1?'':'s'} in this window.</p><div className="fuel-v2-summary-grid"><span><b>{totals.mix}</b>Bottle Mix</span><span><b>{totals.regular+totals.boost}</b>Gels</span><span><b>{totals.hydrate}</b>Hydrate</span><span><b>{totals.recover}</b>Recover</span></div><button className="primary fuel-v2-wide" disabled={!rows.length} onClick={addAll}><ShoppingBag size={17}/>Add {horizon}-day training fuel</button></section>
+    {rows.length?rows.map(s=>{const gels=n(s.regular_gels)+n(s.boost_gels);return <section className="card fuel-v2-session" key={s.id}><div className="row-between"><div><span className="eyebrow">{fmtDate(s.session_date)}</span><h3>{s.title}</h3></div><strong className="fuel-v2-gph">{n(s.carb_target_gph)} g/h</strong></div><p className="muted">{mins(s.duration_minutes)} · {deliveryLabel(s.fuel_delivery_mode)} · {n(s.hydration_ml_per_hour)} ml/h · {n(s.sodium_target_mg_per_hour)} mg sodium/h</p><div className="fuel-v2-session-grid"><span><b>{n(s.bottle_mix_sachets)}</b>Mix</span><span><b>{gels}</b>{n(s.boost_gels)?`Gels · ${n(s.boost_gels)} Boost`:'Gels'}</span><span><b>{n(s.hydrate_servings)}</b>Hydrate</span><span><b>{n(s.recover_servings)}</b>Recover</span></div>{s.fueling_note&&<p className="muted">{s.fueling_note}</p>}<button className="secondary fuel-v2-wide" onClick={()=>addSession(s)}>Add this session</button></section>}):<section className="card empty"><Fuel size={26}/><p>No upcoming training sessions in this horizon.</p></section>}
   </div>
 }
 
