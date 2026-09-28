@@ -1,8 +1,8 @@
 {
-  "id":"/just-fuel-current-v14",
+  "id":"/just-fuel-current-v15",
   "name":"Just Fuel",
   "short_name":"Just Fuel",
-  "start_url":"/?jfapp=14&source=install",
+  "start_url":"/current?jfapp=15&source=install",
   "scope":"/",
   "display":"standalone",
   "orientation":"portrait-primary",
