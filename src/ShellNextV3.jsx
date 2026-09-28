@@ -1,15 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowLeft, Flag, Fuel, Home, ShoppingBag, Store, UserRound } from 'lucide-react';
-import TrainingApp from './App';
-import CheckoutDrawer from './CheckoutDrawer';
 import { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
-import { FuelBuilder, ShopPage, LearnPage } from './CommercePages';
 import HomeIndex from './HomeIndex';
-import FuelHubV2 from './FuelHubV2';
-import ProfileHub from './ProfileHub';
 import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, normalizeFuelView, trainingTabForRoute, trainingTargetForView, trainingViewFromState } from './navigation-registry';
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
+
+const TrainingApp=lazy(()=>import('./App'));
+const CheckoutDrawer=lazy(()=>import('./CheckoutDrawer'));
+const FuelHubV2=lazy(()=>import('./FuelHubV2'));
+const ProfileHub=lazy(()=>import('./ProfileHub'));
+const FuelBuilder=lazy(()=>import('./CommercePages').then(mod=>({default:mod.FuelBuilder})));
+const ShopPage=lazy(()=>import('./CommercePages').then(mod=>({default:mod.ShopPage})));
+const LearnPage=lazy(()=>import('./CommercePages').then(mod=>({default:mod.LearnPage})));
 
 const NAV_ICONS={home:Home,training:Activity,race:Flag,fuel:Fuel,shop:Store};
 const BASKET_KEY = 'just-fuel-basket-v3';
@@ -24,6 +27,7 @@ function loadLastBasket(){
   try{const raw=localStorage.getItem(LAST_BASKET_KEY);const items=readSavedItems(raw,LAST_BASKET_TTL);if(raw&&!items.length)localStorage.removeItem(LAST_BASKET_KEY);return items}catch{return[]}
 }
 function resetScroll(){window.scrollTo({top:0,left:0,behavior:'auto'})}
+function RouteLoading(){return <div className="center-screen"><p>Loading…</p></div>}
 
 export default function ShellNextV3(){
   const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search,pathname:window.location.pathname}));
@@ -134,20 +138,22 @@ export default function ShellNextV3(){
     {reminderDue&&!isTrainingArea&&!profileOpen&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('fuel',{fuelView:'planner'});dismissReminder()}} onDismiss={dismissReminder}/>} 
 
     <div className="shell-content">
-      {profileOpen?<ProfileHub onClose={closeProfile} reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>:<>
-        {section==='home'&&homeView==='index'&&<HomeIndex goRoute={setSection} openHomeView={openHomeView}/>} 
-        {section==='home'&&homeView!=='index'&&<HomeSubpageHead title={homeView==='plan'?'Quick Fuel Planner':homeView==='learn'?'Learn':'Settings & Reminders'} onBack={()=>window.history.back()}/>} 
-        {section==='home'&&homeView==='plan'&&<FuelBuilder addLine={addLine} openBasket={openBasket}/>} 
-        {section==='home'&&homeView==='learn'&&<LearnPage/>}
-        {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
-        {section==='training'&&<TrainingPhaseNav value={trainingView} onChange={openTrainingView}/>} 
-        {section==='fuel'&&<FuelHubV2 addLine={addLine} openBasket={openBasket} viewTarget={fuelView} onViewChange={setFuelView}/>} 
-        {isTrainingArea&&<TrainingApp key={`${section}-${section==='training'?trainingView:'root'}`}/>} 
-      </>}
+      <Suspense fallback={<RouteLoading/>}>
+        {profileOpen?<ProfileHub onClose={closeProfile} reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>:<>
+          {section==='home'&&homeView==='index'&&<HomeIndex goRoute={setSection} openHomeView={openHomeView}/>} 
+          {section==='home'&&homeView!=='index'&&<HomeSubpageHead title={homeView==='plan'?'Quick Fuel Planner':homeView==='learn'?'Learn':'Settings & Reminders'} onBack={()=>window.history.back()}/>} 
+          {section==='home'&&homeView==='plan'&&<FuelBuilder addLine={addLine} openBasket={openBasket}/>} 
+          {section==='home'&&homeView==='learn'&&<LearnPage/>}
+          {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
+          {section==='training'&&<TrainingPhaseNav value={trainingView} onChange={openTrainingView}/>} 
+          {section==='fuel'&&<FuelHubV2 addLine={addLine} openBasket={openBasket} viewTarget={fuelView} onViewChange={setFuelView}/>} 
+          {isTrainingArea&&<TrainingApp key={`${section}-${section==='training'?trainingView:'root'}`}/>} 
+        </>}
+      </Suspense>
     </div>
 
     {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>}
-    <CheckoutDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/>
+    <Suspense fallback={null}><CheckoutDrawer open={basketOpen} close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/></Suspense>
   </div>
 }
 
