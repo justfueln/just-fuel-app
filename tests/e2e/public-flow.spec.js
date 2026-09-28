@@ -4,7 +4,7 @@ test('public shell navigation, fuel planner and shop basket work', async ({ page
   await page.goto('/?jfapp=16&legacy=cleared&e2e=1');
 
   await expect(page.getByText('JUST FUEL').first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: /Train\. Race\. Fuel\./i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Know what to do next\./i })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Training', exact: true }).click();
