@@ -118,7 +118,9 @@ export async function verifyTrainingOtp(client,email,token){
 }
 
 export async function syncTrainingStrava(client){
-  return client.functions.invoke('strava-sync',{body:{}});
+  const result=await client.functions.invoke('strava-sync',{body:{}});
+  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('jf-strava-synced',{detail:result?.data||null}));
+  return result;
 }
 
 export async function startTrainingStrava(client){
