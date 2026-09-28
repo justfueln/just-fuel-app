@@ -13,6 +13,7 @@ const mins=v=>{const n=Math.max(0,Math.round(Number(v)||0)),h=Math.floor(n/60),m
 const todayKey=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const addDays=days=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);const p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const n=v=>Math.max(0,Number(v)||0);
+const daysTo=date=>{if(!date)return null;const now=new Date();now.setHours(0,0,0,0);const target=new Date(`${String(date).slice(0,10)}T12:00:00`);return Math.max(0,Math.ceil((target-now)/86400000))};
 const deliveryLabel=value=>({bottle_first:'Bottle-first',gels_first:'Gels-first',brick_split:'Bike bottles + run gels',session_support:'Hydration + recovery',poolside:'Poolside',mixed:'Mixed'}[String(value||'')]||'Balanced');
 const friendlyFuelError=error=>{
   if(!error)return'';
@@ -29,6 +30,24 @@ const PRODUCT_ROWS=[
   ['recover','Recover','servings']
 ];
 
+async function fetchNextRaceFuel(client,userId){
+  const raceResult=await client.from('athlete_season_events')
+    .select('race_goal_id,event_name,event_date,goal_time_minutes,status')
+    .eq('user_id',userId)
+    .eq('status','active')
+    .gte('event_date',todayKey())
+    .order('event_date',{ascending:true})
+    .limit(1)
+    .maybeSingle();
+  if(raceResult.error)return{race:null,fuel:null,error:raceResult.error};
+  if(!raceResult.data?.race_goal_id)return{race:raceResult.data||null,fuel:null,error:null};
+  const fuelResult=await client.from('race_fuel_plan')
+    .select('race_goal_id,carb_target_gph,race_duration_minutes,carb_target_g_total,hydration_ml_per_hour,sodium_target_mg_per_hour,bottle_mix_sachets,regular_gels,boost_gels,post_race_recover_servings')
+    .eq('race_goal_id',raceResult.data.race_goal_id)
+    .maybeSingle();
+  return{race:raceResult.data,fuel:fuelResult.data||null,error:fuelResult.error||null};
+}
+
 export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewChange}){
   const[view,setView]=useState(()=>normalizeFuelView(viewTarget||window.history.state?.jfFuelView));
   const[session,setSession]=useState(null);
@@ -39,7 +58,8 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
   const[forecastReady,setForecastReady]=useState(false);
   const[stock,setStock]=useState([]);
   const[fuelProfile,setFuelProfile]=useState(null);
-  const[moreOpen,setMoreOpen]=useState(false);
+  const[nextRace,setNextRace]=useState(null);
+  const[raceFuel,setRaceFuel]=useState(null);
   const mountedRef=useRef(true);
   const autoLoadedUserRef=useRef('');
   const loadPromiseRef=useRef(null);
@@ -48,7 +68,7 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
   useEffect(()=>{
     mountedRef.current=true;
     let mounted=true;
-    const clearUser=()=>{setPlan([]);setForecast([]);setForecastReady(false);setStock([]);setFuelProfile(null);setLoading(false)};
+    const clearUser=()=>{setPlan([]);setForecast([]);setForecastReady(false);setStock([]);setFuelProfile(null);setNextRace(null);setRaceFuel(null);setLoading(false)};
     const autoLoad=next=>{
       if(!mounted)return;
       setSession(next||null);
@@ -73,8 +93,11 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
     if(loadPromiseRef.current)return loadPromiseRef.current;
     const task=(async()=>{
       if(mountedRef.current){setLoading(true);setMessage('')}
-      const[planResult,baseResult,forecastResult]=await Promise.all([
-        fetchFuelTrainingPlan(supabase,userId),fetchTrainingFuelBase(supabase,userId),fetchTrainingFuelForecast(supabase,userId)
+      const[planResult,baseResult,forecastResult,raceResult]=await Promise.all([
+        fetchFuelTrainingPlan(supabase,userId),
+        fetchTrainingFuelBase(supabase,userId),
+        fetchTrainingFuelForecast(supabase,userId),
+        fetchNextRaceFuel(supabase,userId)
       ]);
       if(!mountedRef.current)return;
       const error=planResult.error||baseResult.error||forecastResult.error;
@@ -84,6 +107,8 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
       setFuelProfile(baseResult.fuelProfile||null);
       setForecast(forecastResult.fuel||[]);
       setForecastReady(!forecastResult.error);
+      setNextRace(raceResult.race||null);
+      setRaceFuel(raceResult.fuel||null);
       setLoading(false);
     })();
     loadPromiseRef.current=task;
@@ -92,7 +117,7 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
 
   function go(next){
     const id=normalizeFuelView(next);
-    setMoreOpen(false);setView(id);onViewChange?.(id);
+    setView(id);onViewChange?.(id);
     window.history.pushState({...window.history.state,jfSection:'fuel',jfFuelView:id,jfBasket:false},'',window.location.href);
     window.scrollTo({top:0,behavior:'auto'});
   }
@@ -100,51 +125,65 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
 
   const futurePlan=useMemo(()=>plan.filter(row=>row.session_date>=todayKey()),[plan]);
   const week=useMemo(()=>futurePlan.filter(row=>row.session_date<addDays(7)),[futurePlan]);
+  const nextSession=week[0]||futurePlan[0]||null;
   const weekTotals=useMemo(()=>tallySessions(week),[week]);
-  const weekShortfalls=useMemo(()=>forecastReady?restockShortfalls(forecast.filter(x=>Number(x.horizon_days)===7)):({}),[forecast,forecastReady]);
+  const weekForecast=useMemo(()=>forecast.filter(x=>Number(x.horizon_days)===7),[forecast]);
+  const weekShortfalls=useMemo(()=>forecastReady?restockShortfalls(weekForecast):({}),[weekForecast,forecastReady]);
   const shortfallUnits=useMemo(()=>forecastReady?orderUnits(weekShortfalls):0,[weekShortfalls,forecastReady]);
+  const stockStatus=useMemo(()=>PRODUCT_ROWS.map(([key,label,unit])=>{
+    const forecastRow=weekForecast.find(row=>row.product_key===key);
+    const stockRow=stock.find(row=>row.product_key===key);
+    return{key,label,unit,required:n(forecastRow?.required_units),onHand:n(forecastRow?.quantity_on_hand??stockRow?.quantity_on_hand),short:n(weekShortfalls[key])};
+  }),[weekForecast,stock,weekShortfalls]);
   const primaryFuelNav=useMemo(()=>FUEL_NAV.filter(item=>item.group==='primary'),[]);
-  const secondaryFuelNav=useMemo(()=>FUEL_NAV.filter(item=>item.group==='more'),[]);
+  const utilityFuelNav=useMemo(()=>FUEL_NAV.filter(item=>item.group==='utility'),[]);
+  const planAction=primaryFuelNav.find(item=>item.id==='training');
+  const stockAction=primaryFuelNav.find(item=>item.id==='stock');
 
   if(view==='planner')return <FuelPageFrame title="Quick Fuel Planner" subtitle="Build a simple session fuel plan." onBack={back}><FuelBuilder addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
   if(view==='review')return <FuelPageFrame title="Fuel Review" subtitle="Compare planned fuel with what you actually used." onBack={back}><TrainingFuelReview/></FuelPageFrame>;
-  if(view==='training')return <FuelPageFrame title="Training Fuel" subtitle="Sport-aware fuel, hydration and recovery for upcoming training." onBack={back}><TrainingFuel plan={futurePlan} fuelProfile={fuelProfile} userId={session?.user?.id} reload={loadAll} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
-  if(view==='stock')return <FuelPageFrame title="My Stock" subtitle="Keep your cupboard stock up to date." onBack={back}><StockPage session={session} stock={stock} reload={loadAll}/></FuelPageFrame>;
-  if(view==='order')return <FuelPageFrame title="Order Needed" subtitle="Only the shortfall for your selected training horizon." onBack={back}><OrderNeeded forecast={forecastReady?forecast:[]} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
+  if(view==='training')return <FuelPageFrame title="Plan Fuel" subtitle="Sport-aware fuel, hydration and recovery for upcoming training." onBack={back}><TrainingFuel plan={futurePlan} fuelProfile={fuelProfile} userId={session?.user?.id} reload={loadAll} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
+  if(view==='stock')return <FuelPageFrame title="Update Stock" subtitle="Keep your cupboard stock up to date." onBack={back}><StockPage session={session} stock={stock} reload={loadAll}/></FuelPageFrame>;
+  if(view==='order')return <FuelPageFrame title="Order Shortage" subtitle="Only the shortfall for your selected training horizon." onBack={back}><OrderNeeded forecast={forecastReady?forecast:[]} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
 
-  return <div className="fuel-v2-shell">
+  return <div className="fuel-v2-shell fuel-v3-home">
     <header className="fuel-v2-head">
-      <div><span className="eyebrow">FUEL</span><h2>Your fueling hub</h2><p>Plan it, practise it, review it and keep enough stock for the training ahead.</p></div>
+      <div><span className="eyebrow">FUEL</span><h2>What do I need?</h2><p>Your upcoming fuel requirement, what you already have and what is short.</p></div>
       {session?.user&&<button className="icon-btn" onClick={()=>loadAll()} disabled={loading} aria-label="Refresh fuel"><RefreshCw size={18}/></button>}
     </header>
 
-    {!session?.user&&<section className="card fuel-v2-signin"><Fuel size={24}/><div><h3>Training fuel needs a sign-in</h3><p className="muted">The Quick Fuel Planner still works without a login. Sign in under Training to unlock training fuel, reviews and stock forecasting.</p></div></section>}
+    {!session?.user&&<section className="card fuel-v2-signin"><Fuel size={24}/><div><h3>Start with a simple fuel plan</h3><p className="muted">The Quick Fuel Planner works without a login. Sign in under Training to unlock automatic training needs, stock and shortfall forecasting.</p></div></section>}
     {message&&<div className="notice">{message}</div>}
 
-    {session?.user&&<section className="card fuel-v2-summary">
-      <div><span className="eyebrow">NEXT 7 DAYS</span><h3>{week.length} planned session{week.length===1?'':'s'}</h3></div>
-      <div className="fuel-v2-summary-grid">
-        <span><b>{weekTotals.mix}</b>Bottle Mix</span><span><b>{weekTotals.regular+weekTotals.boost}</b>Total gels</span><span><b>{weekTotals.hydrate}</b>Hydrate</span><span><b>{weekTotals.recover}</b>Recover</span>
-      </div>
-      {!forecastReady?<div className="fuel-v2-stock-callout needs-order"><RefreshCw size={19}/><div><strong>{loading?'Updating stock forecast…':'Stock forecast not loaded'}</strong><small>{loading?'This should only take a moment.':'Tap refresh to try again.'}</small></div></div>:<div className={`fuel-v2-stock-callout ${shortfallUnits?'needs-order':'ready'}`}><PackageCheck size={19}/><div><strong>{shortfallUnits?`${shortfallUnits} unit${shortfallUnits===1?'':'s'} short`:'Stock covers the 7-day forecast'}</strong><small>{shortfallUnits?'Open Order Needed to see the exact shortfall.':'Keep My Stock updated for accurate forecasting.'}</small></div></div>}
-    </section>}
+    {session?.user&&<>
+      <section className="card fuel-v3-need-card">
+        <div className="row-between"><div><span className="eyebrow">UPCOMING TRAINING</span><h3>Next 7 days</h3></div><Fuel size={21}/></div>
+        <p className="fuel-v3-context">{week.length?`${week.length} planned session${week.length===1?'':'s'}${nextSession?` · next: ${fmtDate(nextSession.session_date)} — ${nextSession.title}`:''}`:'No planned training sessions in the next 7 days.'}</p>
+        <div className="fuel-v2-summary-grid"><span><b>{weekTotals.mix}</b>Bottle Mix</span><span><b>{weekTotals.regular+weekTotals.boost}</b>Gels</span><span><b>{weekTotals.hydrate}</b>Hydrate</span><span><b>{weekTotals.recover}</b>Recover</span></div>
+      </section>
 
-    <div className="fuel-v2-menu">
-      {primaryFuelNav.map(item=><FuelMenuCard key={item.id} item={item} onClick={()=>go(item.id)} locked={item.requiresLogin&&!session?.user}/>)}
-      <button type="button" className="fuel-v2-menu-card fuel-v2-more-toggle" aria-expanded={moreOpen} onClick={()=>setMoreOpen(v=>!v)}>
-        <span><SlidersHorizontal size={20}/></span><div><strong>More tools</strong><small>Fuel review, cupboard stock and order shortfalls.</small></div><ChevronRight size={19}/>
-      </button>
-    </div>
-    {moreOpen&&<div className="fuel-v2-more-panel" aria-label="More fuel tools">{secondaryFuelNav.map(item=><FuelMenuCard key={item.id} item={item} onClick={()=>go(item.id)} locked={item.requiresLogin&&!session?.user}/>)}</div>}
+      <section className="card fuel-v3-race-card">
+        <div className="row-between"><div><span className="eyebrow">NEXT RACE</span><h3>{nextRace?.event_name||'No upcoming race'}</h3></div>{nextRace?.event_date&&<strong className="fuel-v3-days">{daysTo(nextRace.event_date)}d</strong>}</div>
+        {!nextRace?<p className="muted">Add a race under Race when you want race-day fuel included in your preparation.</p>:<><p className="fuel-v3-context">{fmtDate(nextRace.event_date)}{raceFuel?.race_duration_minutes?` · ${mins(raceFuel.race_duration_minutes)}`:''}</p>{raceFuel?<div className="fuel-v2-summary-grid"><span><b>{n(raceFuel.carb_target_gph)}</b>g carbs/h</span><span><b>{n(raceFuel.bottle_mix_sachets)}</b>Bottle Mix</span><span><b>{n(raceFuel.regular_gels)+n(raceFuel.boost_gels)}</b>Gels</span><span><b>{n(raceFuel.hydration_ml_per_hour)}</b>ml/h</span></div>:<p className="muted">Race fuel will appear here once the race plan has been calculated. Edit race-specific targets under Race → Fuel.</p>}</>}
+      </section>
+
+      <section className="card fuel-v3-stock-card">
+        <div className="row-between"><div><span className="eyebrow">STOCK CHECK</span><h3>{!forecastReady?(loading?'Checking what you have…':'Forecast unavailable'):shortfallUnits?`You are short ${shortfallUnits} order unit${shortfallUnits===1?'':'s'}`:'You have enough for the next 7 days'}</h3></div><PackageCheck size={21}/></div>
+        <div className="fuel-v3-stock-grid">{stockStatus.map(row=><div key={row.key} className={row.short?'short':'covered'}><div><strong>{row.label}</strong><small>{Math.floor(row.onHand)} on hand{forecastReady?` · ${Math.ceil(row.required)} needed`:''}</small></div><b>{!forecastReady?'—':row.short?`${Math.ceil(row.short)} short`:'Covered'}</b></div>)}</div>
+        {forecastReady&&shortfallUnits>0&&<button className="secondary fuel-v2-wide" onClick={()=>go('order')}><ShoppingBag size={17}/>See exact order shortage</button>}
+      </section>
+    </>}
+
+    <section className="fuel-v3-actions" aria-label="Fuel actions">
+      <button className="fuel-v3-action primary" onClick={()=>go(session?.user?'training':'planner')}><Fuel size={19}/><span><strong>{session?.user?(planAction?.label||'Plan Fuel'):'Plan Fuel'}</strong><small>{session?.user?'Use your upcoming training plan.':'Build a quick standalone fuel plan.'}</small></span><ChevronRight size={18}/></button>
+      <button className="fuel-v3-action secondary" disabled={!session?.user} onClick={()=>go('stock')}><PackageCheck size={19}/><span><strong>{stockAction?.label||'Update Stock'}</strong><small>{session?.user?'Keep your cupboard quantities accurate.':'Sign in to track stock.'}</small></span><ChevronRight size={18}/></button>
+    </section>
+
+    <section className="fuel-v3-tools">
+      <span className="eyebrow">OTHER FUEL TOOLS</span>
+      <div>{utilityFuelNav.map(item=><button key={item.id} onClick={item.requiresLogin&&!session?.user?undefined:()=>go(item.id)} disabled={item.requiresLogin&&!session?.user}><span>{item.label}</span><ChevronRight size={16}/></button>)}</div>
+    </section>
   </div>;
-}
-
-function FuelMenuCard({item,onClick,locked}){
-  const icons={planner:Gauge,training:Fuel,review:SlidersHorizontal,stock:PackageCheck,order:ShoppingBag};
-  const Icon=icons[item.id]||Fuel;
-  return <button className={`fuel-v2-menu-card ${locked?'locked':''}`} onClick={locked?undefined:onClick} disabled={locked}>
-    <span><Icon size={20}/></span><div><strong>{item.label}</strong><small>{item.copy}</small></div><ChevronRight size={19}/>
-  </button>;
 }
 
 function FuelPageFrame({title,subtitle,onBack,children}){return <div className="fuel-v2-page"><div className="fuel-v2-topbar"><button onClick={onBack} aria-label="Back to Fuel"><ArrowLeft size={20}/></button><div><span>FUEL</span><strong>{title}</strong><small>{subtitle}</small></div></div>{children}</div>}
@@ -178,7 +217,7 @@ function StockPage({session,stock,reload}){
   async function save(){
     if(!session?.user)return;setSaving(true);setStatus('Saving stock…');
     for(const[key]of PRODUCT_ROWS){const result=await supabase.from('fuel_inventory').upsert({user_id:session.user.id,product_key:key,quantity_on_hand:n(values[key])},{onConflict:'user_id,product_key'});if(result.error){setStatus(result.error.message);setSaving(false);return}}
-    setStatus('Stock saved. Your Order Needed forecast has been updated.');await reload(session.user.id);setSaving(false);
+    setStatus('Stock saved. Your Order Shortage forecast has been updated.');await reload(session.user.id);setSaving(false);
   }
   return <div className="stack"><section className="card"><span className="eyebrow">MY STOCK</span><h3>What is in your cupboard?</h3><p className="muted">Keep this updated and Just Fuel can calculate what you need for upcoming training.</p><div className="fuel-v2-stock-list">{PRODUCT_ROWS.map(([key,label,unit])=><label key={key}><div><strong>{label}</strong><small>{unit}</small></div><input type="number" min="0" inputMode="numeric" value={values[key]??0} onChange={e=>setValues(v=>({...v,[key]:e.target.value}))}/></label>)}</div><button className="primary fuel-v2-wide" disabled={saving} onClick={save}><Save size={17}/>{saving?'Saving…':'Save My Stock'}</button>{status&&<p className="form-status">{status}</p>}</section></div>
 }
