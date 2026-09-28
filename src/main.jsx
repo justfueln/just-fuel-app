@@ -43,6 +43,7 @@ import './training-progression-v1.css';
 import './training-ftp-detection-v1.css';
 import './training-power-curve-v1.css';
 import './training-achievements-v1.css';
+import './race-goal-progress-v1.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
@@ -58,6 +59,7 @@ import './training-progression-v1';
 import './training-ftp-detection-v1';
 import './training-power-curve-v1';
 import './training-achievements-v1';
+import './race-goal-progress-v1';
 import './app-analytics';
 
 export const supabase = createClient(
