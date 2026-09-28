@@ -49,7 +49,7 @@ test('Phase 4 preserves race fuel and checklist engines',async()=>{
 test('Phase 4 is mobile-first and hides legacy duplicate race surfaces',async()=>{
   const css=await readFile(cssUrl,'utf8');
   assert.match(css,/grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
-  assert.match(css,/\.race-v2-shell \.race-v2-menu/);
+  assert.match(css,/\.race-v2-shell \.race-v2-menu\{display:none!important\}/);
   assert.match(css,/\.race-v2-list>\.jf-race-week\{display:none!important\}/);
   assert.match(css,/@media\(max-width:520px\)/);
   const guard=await readFile(guardUrl,'utf8');
