@@ -9,15 +9,12 @@ export const APP_ROUTES={
 export const BOTTOM_NAV=['home','training','race','fuel','shop'];
 export const MAIN_ROUTE_IDS=BOTTOM_NAV.slice();
 
-// Roadmap V2 Phase 3: Training has three everyday destinations only.
 export const TRAINING_NAV=[
   {id:'today',label:'Today',legacyTab:'Overview',subView:null,group:'primary'},
   {id:'plan',label:'Plan',legacyTab:'My Plan',subView:null,group:'primary'},
   {id:'progress',label:'Progress',legacyTab:'History',subView:'Progress',group:'primary'}
 ];
 
-// Roadmap V2 Phase 4: a race opens on its dashboard, then exposes only three primary actions.
-// Stages, route detail and water points belong inside Race Plan rather than the top-level race menu.
 export const RACE_NAV=[
   {id:'races',label:'My Races',group:'root'},
   {id:'registry',label:'Event Registry',group:'action'},
@@ -30,17 +27,19 @@ export const RACE_NAV=[
   {id:'stage',label:'Stage',stageOnly:true,detail:true,group:'detail'}
 ];
 
+// Roadmap V2 Phase 5: Fuel answers "What do I need?" first.
+// Only Plan Fuel and Update Stock are primary actions; the detailed tools remain available contextually.
 export const FUEL_NAV=[
-  {id:'home',label:'Fuel Home',copy:'Your next-week fuel requirement and stock status.',group:'root'},
-  {id:'planner',label:'Quick Fuel Planner',copy:'Build a simple fuel plan for any ride or session.',group:'primary'},
-  {id:'training',label:'Training Fuel',copy:'See exactly what your upcoming training plan requires.',requiresLogin:true,group:'primary'},
-  {id:'review',label:'Fuel Review',copy:'Compare planned intake with what you actually consumed.',requiresLogin:true,group:'more'},
-  {id:'stock',label:'My Stock',copy:'Keep your Just Fuel cupboard quantities up to date.',requiresLogin:true,group:'more'},
-  {id:'order',label:'Order Needed',copy:'See only the shortfall for the next 7, 14 or 30 days.',requiresLogin:true,group:'more'}
+  {id:'home',label:'Fuel Home',copy:'Upcoming requirements, stock and shortfalls.',group:'root'},
+  {id:'training',label:'Plan Fuel',copy:'See exactly what upcoming training requires.',requiresLogin:true,group:'primary'},
+  {id:'stock',label:'Update Stock',copy:'Tell Just Fuel what you already have.',requiresLogin:true,group:'primary'},
+  {id:'planner',label:'Quick Fuel Planner',copy:'Build a fuel plan for any standalone session.',group:'utility'},
+  {id:'review',label:'Fuel Review',copy:'Compare planned intake with what you actually consumed.',requiresLogin:true,group:'utility'},
+  {id:'order',label:'Order Shortage',copy:'See only what you are short for 7, 14 or 30 days.',requiresLogin:true,group:'contextual'}
 ];
 
 export function normalizeFuelView(value){
-  const aliases={home:'home',overview:'home',planner:'planner','Quick Fuel Planner':'planner',training:'training','Training Fuel':'training',review:'review','Fuel Review':'review',stock:'stock','My Stock':'stock',order:'order','Order Needed':'order'};
+  const aliases={home:'home',overview:'home',planner:'planner','Quick Fuel Planner':'planner',training:'training','Training Fuel':'training','Plan Fuel':'training',review:'review','Fuel Review':'review',stock:'stock','My Stock':'stock','Update Stock':'stock',order:'order','Order Needed':'order','Order Shortage':'order'};
   return aliases[value]||'home';
 }
 
@@ -96,6 +95,6 @@ export function appAreaForTrainingTab(value){const legacy=normalizeTrainingLegac
 export const HOME_INDEX_ITEMS=[
   {id:'training',title:'Training',copy:'Today, your plan and progress in one simple flow.',route:'training'},
   {id:'race',title:'Race',copy:'Your races, dashboard, race plan, fuel and checklist.',route:'race'},
-  {id:'fuel',title:'Fuel',copy:'Planner, training fuel, reviews, stock and order requirements.',route:'fuel'},
+  {id:'fuel',title:'Fuel',copy:'What you need for training and racing, what you have, and what is short.',route:'fuel'},
   {id:'shop',title:'Shop',copy:'Browse Just Fuel products and checkout.',route:'shop'}
 ];
