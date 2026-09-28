@@ -41,6 +41,7 @@ import './training-readiness-v1.css';
 import './training-week-learning-v1.css';
 import './training-progression-v1.css';
 import './training-ftp-detection-v1.css';
+import './training-power-curve-v1.css';
 import './basketBridge';
 import './training-boost-control';
 import './training-workout-details';
@@ -54,6 +55,7 @@ import './training-readiness-v1';
 import './training-week-learning-v1';
 import './training-progression-v1';
 import './training-ftp-detection-v1';
+import './training-power-curve-v1';
 import './app-analytics';
 
 export const supabase = createClient(
