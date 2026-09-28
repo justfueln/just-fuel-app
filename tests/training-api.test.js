@@ -22,11 +22,11 @@ test('training plan service returns only the active plan sessions',async()=>{
   assert.deepEqual(result.plan,[{id:1,plan_id:'active'}]);
 });
 
-test('training history reads only the deduplicated analysis view and maps effective metrics',async()=>{
+test('training history reads the deduplicated multisport metrics view and maps effective metrics plus JF load',async()=>{
   const tables=[];
   const client={from(table){
     tables.push(table);
-    if(table!=='strava_activities_analysis')throw new Error(`Unexpected table ${table}`);
+    if(table!=='training_activity_metrics')throw new Error(`Unexpected table ${table}`);
     return query({data:[{
       id:'activity-1',
       strava_activity_id:'123',
@@ -36,15 +36,21 @@ test('training history reads only the deduplicated analysis view and maps effect
       effective_average_watts:244,
       effective_weighted_average_watts:263,
       effective_kilojoules:1420,
-      effective_calories:1360
+      effective_calories:1360,
+      estimated_training_load:82,
+      load_source:'heart_rate',
+      load_confidence:'medium',
+      sport_family:'running'
     }],error:null});
   }};
   const result=await fetchTrainingHistory(client,'user-1');
   assert.equal(result.error,null);
-  assert.deepEqual(tables,['strava_activities_analysis']);
+  assert.deepEqual(tables,['training_activity_metrics']);
   assert.equal(result.history.length,1);
   assert.equal(result.history[0].average_watts,244);
   assert.equal(result.history[0].weighted_average_watts,263);
   assert.equal(result.history[0].average_heartrate,151);
   assert.equal(result.history[0].calories,1360);
+  assert.equal(result.history[0].raw.suffer_score,82);
+  assert.equal(result.history[0].raw.jf_load_source,'heart_rate');
 });
