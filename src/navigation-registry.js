@@ -16,15 +16,18 @@ export const TRAINING_NAV=[
   {id:'progress',label:'Progress',legacyTab:'History',subView:'Progress',group:'primary'}
 ];
 
+// Roadmap V2 Phase 4: a race opens on its dashboard, then exposes only three primary actions.
+// Stages, route detail and water points belong inside Race Plan rather than the top-level race menu.
 export const RACE_NAV=[
   {id:'races',label:'My Races',group:'root'},
   {id:'registry',label:'Event Registry',group:'action'},
-  {id:'overview',label:'Overview',group:'primary'},
-  {id:'stages',label:'Stages',stageOnly:true,group:'more'},
-  {id:'stage',label:'Stage',stageOnly:true,detail:true,group:'detail'},
-  {id:'fuel',label:'Fuel & Hydration',group:'primary'},
-  {id:'water',label:'Water Points',group:'more'},
-  {id:'checklist',label:'Checklist',group:'more'}
+  {id:'dashboard',label:'Race Dashboard',group:'dashboard'},
+  {id:'plan',label:'Race Plan',group:'primary'},
+  {id:'fuel',label:'Fuel',group:'primary'},
+  {id:'checklist',label:'Checklist',group:'primary'},
+  {id:'stages',label:'Stages',stageOnly:true,group:'plan'},
+  {id:'water',label:'Water Points',group:'plan'},
+  {id:'stage',label:'Stage',stageOnly:true,detail:true,group:'detail'}
 ];
 
 export const FUEL_NAV=[
@@ -92,7 +95,7 @@ export function appAreaForTrainingTab(value){const legacy=normalizeTrainingLegac
 
 export const HOME_INDEX_ITEMS=[
   {id:'training',title:'Training',copy:'Today, your plan and progress in one simple flow.',route:'training'},
-  {id:'race',title:'Race',copy:'Your races, race guides, stages, water points and execution.',route:'race'},
+  {id:'race',title:'Race',copy:'Your races, dashboard, race plan, fuel and checklist.',route:'race'},
   {id:'fuel',title:'Fuel',copy:'Planner, training fuel, reviews, stock and order requirements.',route:'fuel'},
   {id:'shop',title:'Shop',copy:'Browse Just Fuel products and checkout.',route:'shop'}
 ];
