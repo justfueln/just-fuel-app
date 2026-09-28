@@ -11,7 +11,12 @@ if(typeof window!=='undefined'&&window.MutationObserver&&!window.__jfRaceAddonMu
     '.jf-home-race-prep',
     '.jf-race-rehearsal-card',
     '.jf-rehearsal-session',
-    '.jf-race-week'
+    '.jf-race-week',
+    '.race-phase4-primary-nav',
+    '.race-phase4-dashboard-link',
+    '.race-phase4-intelligence',
+    '.race-phase4-plan-intro',
+    '.race-phase4-single-plan'
   ].join(',');
 
   const withinAddon=node=>{
@@ -43,3 +48,7 @@ if(typeof window!=='undefined'&&window.MutationObserver&&!window.__jfRaceAddonMu
   window.MutationObserver=RaceSafeMutationObserver;
   window.__jfRaceAddonMutationGuard=true;
 }
+
+// Roadmap V2 Phase 4 is deliberately loaded after the mutation guard so the
+// simplified Race dashboard can coexist with the older race intelligence add-ons.
+if(typeof window!=='undefined')import('./race-roadmap-phase4').catch(()=>{});
