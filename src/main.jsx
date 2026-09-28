@@ -98,10 +98,6 @@ async function handOffLegacyWorker(){
 
   await deleteLegacyCaches();
 
-  // If the v15 retirement worker has already moved this page to /current,
-  // it is safe to unregister it. An already-controlled page may keep the
-  // worker until the next navigation, but v15 has no fetch handler and cannot
-  // serve an old application shell.
   if(alreadyCleared){
     Promise.all(registrations.map(reg=>reg.unregister().catch(()=>false))).catch(()=>{});
     return false;
@@ -109,9 +105,6 @@ async function handOffLegacyWorker(){
 
   if(!registrations.length&&!hasController) return false;
 
-  // Critical: do not unregister an old worker before replacement. Android can
-  // leave the old worker controlling an installed PWA window even after
-  // unregister(). Replace it first with the network-only retirement worker.
   try{
     const retirement=await navigator.serviceWorker.register('/sw.js?retire=15',{
       scope:'/',
@@ -121,8 +114,6 @@ async function handOffLegacyWorker(){
     try{retirement.waiting?.postMessage('JF_FORCE_ACTIVATE')}catch{}
     try{retirement.installing?.postMessage('JF_FORCE_ACTIVATE')}catch{}
 
-    // The retirement worker normally claims and navigates this window itself.
-    // Keep a network-only fallback in case a browser delays activation.
     window.setTimeout(async()=>{
       await deleteLegacyCaches();
       const current=new URL('/current',window.location.origin);
@@ -153,6 +144,7 @@ function renderApp(){
 async function boot(){
   const handingOff=await handOffLegacyWorker();
   if(handingOff) return;
+  try{document.cookie='jf_shell_v15=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
   renderApp();
 }
 
