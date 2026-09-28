@@ -47,13 +47,14 @@ test('Race Phase 4 opens dashboard then keeps plan fuel checklist as primary act
   await page.getByRole('button',{name:/Cape Town Test Race/}).first().click();
 
   const raceNav=page.getByRole('navigation',{name:'Race sections'});
+  const dashboard=page.locator('.race-phase4-intelligence');
   await expect(page.getByText('RACE DASHBOARD',{exact:true})).toBeVisible();
   await expect(raceNav.getByRole('button',{name:'Race Plan',exact:true})).toBeVisible();
   await expect(raceNav.getByRole('button',{name:'Fuel',exact:true})).toBeVisible();
   await expect(raceNav.getByRole('button',{name:'Checklist',exact:true})).toBeVisible();
-  await expect(page.getByText('81/100')).toBeVisible();
-  await expect(page.getByText('82/100')).toBeVisible();
-  await expect(page.getByText(/25\.0 km\/h/)).toBeVisible();
+  await expect(dashboard.getByText('81/100',{exact:true})).toBeVisible();
+  await expect(dashboard.getByText('82/100',{exact:true})).toBeVisible();
+  await expect(dashboard.getByText(/25\.0 km\/h/)).toBeVisible();
 
   await raceNav.getByRole('button',{name:'Race Plan',exact:true}).click();
   await expect(page.getByText('RACE PLAN',{exact:true})).toBeVisible();
