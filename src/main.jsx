@@ -47,29 +47,9 @@ import './training-power-curve-v1.css';
 import './training-achievements-v1.css';
 import './race-goal-progress-v1.css';
 import './race-fuel-rehearsal-v1.css';
-import './basketBridge';
-import './training-boost-control';
-import './training-workout-details';
-import './training-multisport-targets-v1';
-import './training-simple-flow-v4';
-import './training-feedback';
-import './training-coach-v1';
-import './training-weather-v1';
-import './training-coach-review-v1';
-import './training-adaptive-v1';
-import './training-readiness-v1';
-import './training-week-learning-v1';
-import './training-progression-v1';
-import './training-ftp-detection-v1';
-import './training-power-curve-v1';
-import './training-achievements-v1';
-import './race-addon-stability';
-import './race-goal-progress-v1';
-import './race-fuel-rehearsal-v1';
-import './race-week-execution-v1';
-import './app-analytics';
 
 const CURRENT_APP_VERSION='16';
+let enhancementsScheduled=false;
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -101,14 +81,16 @@ async function handOffLegacyWorker(){
   try{registrations=await navigator.serviceWorker.getRegistrations()}catch{}
   const hasController=Boolean(navigator.serviceWorker.controller);
 
-  await deleteLegacyCaches();
-
   if(alreadyCleared){
     Promise.all(registrations.map(reg=>reg.unregister().catch(()=>false))).catch(()=>{});
+    deleteLegacyCaches().catch(()=>{});
     return false;
   }
 
-  if(!registrations.length&&!hasController) return false;
+  if(!registrations.length&&!hasController){
+    deleteLegacyCaches().catch(()=>{});
+    return false;
+  }
 
   try{
     const retirement=await navigator.serviceWorker.register('/sw.js?retire=16',{
@@ -121,17 +103,56 @@ async function handOffLegacyWorker(){
 
     window.setTimeout(async()=>{
       await deleteLegacyCaches();
-      const current=new URL('/',window.location.origin);
-      current.searchParams.set('jfapp',CURRENT_APP_VERSION);
-      current.searchParams.set('legacy','cleared');
-      current.searchParams.set('fallback','1');
-      current.searchParams.set('t',String(Date.now()));
-      window.location.replace(current.toString());
-    },6500);
+      try{
+        const currentRegs=await navigator.serviceWorker.getRegistrations();
+        await Promise.all(currentRegs.map(reg=>reg.unregister().catch(()=>false)));
+      }catch{}
+    },1200);
     return true;
   }catch(error){
     console.warn('Legacy Just Fuel PWA takeover failed:',error);
     return false;
+  }
+}
+
+function loadEnhancements(){
+  if(enhancementsScheduled)return;
+  enhancementsScheduled=true;
+
+  const run=async()=>{
+    await Promise.all([
+      import('./basketBridge'),
+      import('./training-boost-control'),
+      import('./training-workout-details'),
+      import('./training-multisport-targets-v1'),
+      import('./training-simple-flow-v4'),
+      import('./training-feedback'),
+      import('./training-coach-v1'),
+      import('./training-weather-v1'),
+      import('./training-coach-review-v1'),
+      import('./training-adaptive-v1'),
+      import('./training-readiness-v1'),
+      import('./training-week-learning-v1'),
+      import('./training-progression-v1'),
+      import('./training-ftp-detection-v1'),
+      import('./training-power-curve-v1'),
+      import('./training-achievements-v1')
+    ]);
+
+    await import('./race-addon-stability');
+    await Promise.all([
+      import('./race-goal-progress-v1'),
+      import('./race-fuel-rehearsal-v1'),
+      import('./race-week-execution-v1'),
+      import('./app-analytics')
+    ]);
+  };
+
+  const start=()=>run().catch(error=>console.warn('Deferred Just Fuel enhancements failed:',error));
+  if('requestIdleCallback' in window){
+    window.requestIdleCallback(start,{timeout:1200});
+  }else{
+    window.setTimeout(start,180);
   }
 }
 
@@ -146,11 +167,15 @@ function renderApp(){
   );
 }
 
-async function boot(){
-  const handingOff=await handOffLegacyWorker();
-  if(handingOff) return;
+function boot(){
   try{document.cookie='jf_shell_v16=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
+
+  // First paint must never wait for legacy PWA cleanup or optional enhancements.
   renderApp();
+  loadEnhancements();
+
+  // Retire any old service worker after the current shell is already visible.
+  window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},0);
 }
 
 boot();

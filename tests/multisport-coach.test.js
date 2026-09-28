@@ -54,10 +54,10 @@ test('Strava sync reruns adaptive plan and progression before target refresh',as
   assert.match(source,/progression:progression\.data\|\|null/);
 });
 
-test('current shell loads multisport workout target enhancement',async()=>{
+test('current shell loads multisport workout target enhancement after first paint',async()=>{
   const source=await readFile(mainUrl,'utf8');
   assert.match(source,/training-multisport-targets-v1\.css/);
-  assert.match(source,/training-multisport-targets-v1';/);
+  assert.match(source,/import\('\.\/training-multisport-targets-v1'\)/);
 });
 
 test('workout cards can display power heart rate pace or RPE targets',async()=>{
