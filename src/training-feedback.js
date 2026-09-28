@@ -34,12 +34,14 @@ async function saveFeedback(row,feel,flags=[]){
   const{error}=await sb.from('training_session_feedback').upsert(payload,{onConflict:'user_id,session_id'});
   if(error)throw error;
   feedbackMap.set(row.id,{session_id:row.id,feel,flags});
-  let decision=null,schedule=null;
+  let adaptation=null,progression=null,decision=null,schedule=null;
+  try{const result=await sb.rpc('refresh_training_plan_adaptation',{p_user_id:session.user.id});adaptation=result.data||null}catch{}
+  try{const result=await sb.rpc('refresh_training_progression',{p_user_id:session.user.id});progression=result.data||null}catch{}
   try{const result=await sb.rpc('refresh_next_training_coach_decision',{p_user_id:session.user.id});decision=result.data||null}catch{}
   try{const result=await sb.rpc('refresh_training_schedule_suggestion',{p_user_id:session.user.id});schedule=result.data||null}catch{}
   window.jfTrack?.('workout_feedback_saved',{},'training');
-  window.dispatchEvent(new CustomEvent('jf-training-feedback-saved',{detail:{sessionId:row.id,decision,schedule}}));
-  window.dispatchEvent(new CustomEvent('jf-training-plan-updated',{detail:{source:'feedback',decision,schedule}}));
+  window.dispatchEvent(new CustomEvent('jf-training-feedback-saved',{detail:{sessionId:row.id,adaptation,progression,decision,schedule}}));
+  window.dispatchEvent(new CustomEvent('jf-training-plan-updated',{detail:{source:'feedback',adaptation,progression,decision,schedule}}));
 }
 
 function addFeedback(card,row,existing){
