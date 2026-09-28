@@ -49,6 +49,7 @@ import './race-goal-progress-v1.css';
 import './race-fuel-rehearsal-v1.css';
 
 const CURRENT_APP_VERSION='16';
+const PWA_CLEAN_KEY=`jf-pwa-clean-v${CURRENT_APP_VERSION}`;
 let enhancementsScheduled=false;
 
 export const supabase = createClient(
@@ -56,6 +57,14 @@ export const supabase = createClient(
   'sb_publishable_dQVErA2uFoym91L-vsW-kw_n6dWJfqy',
   { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
 );
+
+function markPwaClean(){
+  try{localStorage.setItem(PWA_CLEAN_KEY,'1')}catch{}
+}
+
+function pwaAlreadyClean(){
+  try{return localStorage.getItem(PWA_CLEAN_KEY)==='1'}catch{return false}
+}
 
 async function deleteLegacyCaches(){
   try{
@@ -70,7 +79,7 @@ async function deleteLegacyCaches(){
 
 async function handOffLegacyWorker(){
   if(!('serviceWorker' in navigator)){
-    await deleteLegacyCaches();
+    markPwaClean();
     return false;
   }
 
@@ -84,11 +93,13 @@ async function handOffLegacyWorker(){
   if(alreadyCleared){
     Promise.all(registrations.map(reg=>reg.unregister().catch(()=>false))).catch(()=>{});
     deleteLegacyCaches().catch(()=>{});
+    markPwaClean();
     return false;
   }
 
+  // Once the old PWA is gone, never clear CacheStorage on every normal launch.
   if(!registrations.length&&!hasController){
-    deleteLegacyCaches().catch(()=>{});
+    if(!pwaAlreadyClean())markPwaClean();
     return false;
   }
 
@@ -107,6 +118,7 @@ async function handOffLegacyWorker(){
         const currentRegs=await navigator.serviceWorker.getRegistrations();
         await Promise.all(currentRegs.map(reg=>reg.unregister().catch(()=>false)));
       }catch{}
+      markPwaClean();
     },1200);
     return true;
   }catch(error){
