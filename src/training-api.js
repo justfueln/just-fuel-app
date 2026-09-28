@@ -64,7 +64,7 @@ export async function fetchFuelTrainingPlan(client,userId){
   const today=new Date(),p=n=>String(n).padStart(2,'0');
   const todayKey=`${today.getFullYear()}-${p(today.getMonth()+1)}-${p(today.getDate())}`;
   const result=await client.from('training_session_fuel_plan_multisport')
-    .select('session_id,plan_id,session_date,sport_type,title,duration_minutes,status,carb_target_gph,bottle_mix_sachets,regular_gels,boost_gels,recover_servings,hydration_ml_per_hour,hydration_ml_total,sodium_target_mg_per_hour,fuel_delivery_mode,fueling_note,hydration_note')
+    .select('session_id,plan_id,session_date,sport_type,title,duration_minutes,status,carb_target_gph,bottle_mix_sachets,regular_gels,boost_gels,hydrate_servings,recover_servings,hydration_ml_per_hour,hydration_ml_total,sodium_target_mg_per_hour,sodium_target_mg_total,fuel_delivery_mode,fueling_note,boost_note,recovery_note,hydration_note')
     .eq('user_id',userId)
     .eq('plan_id',activePlanId)
     .gte('session_date',todayKey)
