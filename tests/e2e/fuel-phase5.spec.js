@@ -23,11 +23,11 @@ test('Fuel Phase 5 answers what the athlete needs before exposing detailed tools
   await installSession(page);
   const tomorrow=dateOffset(1),raceDate=dateOffset(20);
   const forecast=[
-    {horizon_days:7,product_key:'bottle_mix',required_units:4,quantity_on_hand:2},
-    {horizon_days:7,product_key:'energy_gel',required_units:6,quantity_on_hand:10},
-    {horizon_days:7,product_key:'boost_gel',required_units:2,quantity_on_hand:1},
-    {horizon_days:7,product_key:'hydrate',required_units:8,quantity_on_hand:5},
-    {horizon_days:7,product_key:'recover',required_units:2,quantity_on_hand:0}
+    {horizon_days:7,product_key:'bottle_mix',required_units:4,quantity_on_hand:2,shortfall_units:2},
+    {horizon_days:7,product_key:'energy_gel',required_units:6,quantity_on_hand:10,shortfall_units:0},
+    {horizon_days:7,product_key:'boost_gel',required_units:2,quantity_on_hand:1,shortfall_units:1},
+    {horizon_days:7,product_key:'hydrate',required_units:8,quantity_on_hand:5,shortfall_units:3},
+    {horizon_days:7,product_key:'recover',required_units:2,quantity_on_hand:0,shortfall_units:2}
   ];
   const stock=forecast.map(row=>({user_id:USER_ID,product_key:row.product_key,quantity_on_hand:row.quantity_on_hand}));
   const training=[{session_id:'session-1',plan_id:'plan-1',session_date:tomorrow,sport_type:'cycling',title:'Endurance ride',duration_minutes:120,status:'planned',carb_target_gph:60,bottle_mix_sachets:2,regular_gels:2,boost_gels:1,hydrate_servings:2,recover_servings:1,hydration_ml_per_hour:600,sodium_target_mg_per_hour:900,fuel_delivery_mode:'bottle_first'}];
