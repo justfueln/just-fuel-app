@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL='https://ufolqntrfmvefpvrjnsa.supabase.co';
 const KEY='sb_publishable_dQVErA2uFoym91L-vsW-kw_n6dWJfqy';
 const sb=createClient(SUPABASE_URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
-let queued=false,cache=null,cacheAt=0,loading=null;
+let queued=false,cache=null,cacheAt=0,loading=null,stravaRefresh=null;
 
 function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n}
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
@@ -26,6 +26,25 @@ async function load(force=false){
     cache={rows,rowMap:new Map(rows.map(x=>[x.id,x])),decisions:new Map((decisionsResult.data||[]).map(x=>[x.target_session_id,x]))};cacheAt=Date.now();return cache;
   })().finally(()=>{loading=null});
   return loading;
+}
+
+async function refreshCoachAfterStrava(){
+  if(stravaRefresh)return stravaRefresh;
+  stravaRefresh=(async()=>{
+    const{data:{session}}=await sb.auth.getSession();if(!session?.user)return null;
+    const uid=session.user.id;
+    let adaptation=null,progression=null,decision=null,schedule=null;
+    try{const r=await sb.rpc('refresh_training_plan_adaptation',{p_user_id:uid});adaptation=r.data||null}catch{}
+    try{const r=await sb.rpc('refresh_training_progression',{p_user_id:uid});progression=r.data||null}catch{}
+    try{const r=await sb.rpc('refresh_next_training_coach_decision',{p_user_id:uid});decision=r.data||null}catch{}
+    try{const r=await sb.rpc('refresh_training_schedule_suggestion',{p_user_id:uid});schedule=r.data||null}catch{}
+    cache=null;cacheAt=0;
+    const detail={source:'strava_sync',adaptation,progression,decision,schedule};
+    window.dispatchEvent(new CustomEvent('jf-training-plan-updated',{detail}));
+    window.jfTrack?.('adaptive_coach_refreshed_after_strava',{coach_decision:decision?.decision||'none',schedule_status:schedule?.status||'none'},'training');
+    return detail;
+  })().finally(()=>{stravaRefresh=null});
+  return stravaRefresh;
 }
 
 async function applySchedule(targetId,accept){
@@ -52,8 +71,8 @@ function renderSchedule(box,row,d,data){
     const keep=el('button','jf-schedule-secondary','Keep current date');const accept=el('button','jf-schedule-primary',d.schedule_action==='swap'?'Accept swap':'Move session');
     keep.type=accept.type='button';actions.append(keep,accept);wrap.append(actions);
     const status=el('div','jf-schedule-status');wrap.append(status);
-    const run=async(ok,btn)=>{keep.disabled=accept.disabled=true;status.textContent=ok?'Updating training calendar…':'Keeping current schedule…';try{await applySchedule(row.id,ok);status.textContent=ok?'Training calendar updated ✓':'Current date kept ✓';setTimeout(()=>{reset();queue(true)},150)}catch(e){status.textContent=e?.message||'Could not update the schedule.';keep.disabled=accept.disabled=false}};
-    keep.addEventListener('click',()=>run(false,keep));accept.addEventListener('click',()=>run(true,accept));
+    const run=async(ok)=>{keep.disabled=accept.disabled=true;status.textContent=ok?'Updating training calendar…':'Keeping current schedule…';try{await applySchedule(row.id,ok);status.textContent=ok?'Training calendar updated ✓':'Current date kept ✓';setTimeout(()=>{reset();queue(true)},150)}catch(e){status.textContent=e?.message||'Could not update the schedule.';keep.disabled=accept.disabled=false}};
+    keep.addEventListener('click',()=>run(false));accept.addEventListener('click',()=>run(true));
   }else if(d.schedule_status==='accepted'){
     wrap.append(el('strong','',`Coach moved this session to ${fmtDate(d.suggested_date||row.session_date)}.`));
     wrap.append(el('p','',d.schedule_reason||'The schedule was adjusted to create a better recovery gap.'));
@@ -91,6 +110,7 @@ function reset(){cache=null;cacheAt=0;document.querySelectorAll('.session-card[d
 function queue(force=false){if(queued)return;queued=true;setTimeout(()=>{queued=false;scan(force).catch(()=>{})},160)}
 if(typeof window!=='undefined'){
   window.addEventListener('load',()=>queue());window.addEventListener('popstate',()=>queue());
+  window.addEventListener('jf-strava-synced',()=>{refreshCoachAfterStrava().catch(()=>{reset();queue(true)})});
   ['jf-training-feedback-saved','jf-recovery-logged','jf-training-plan-updated'].forEach(name=>window.addEventListener(name,()=>{reset();queue(true)}));
   const start=()=>{if(!document.body)return;new MutationObserver(m=>{if(m.some(x=>x.addedNodes.length||x.removedNodes.length))queue()}).observe(document.body,{childList:true,subtree:true});queue()};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
