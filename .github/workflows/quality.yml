@@ -32,3 +32,27 @@ jobs:
 
       - name: Build production app
         run: npm run build
+
+      - name: Audit public app routing
+        shell: bash
+        run: |
+          set +e
+          echo '=== DNS: app.justfuelnutrition.co.za ==='
+          getent ahosts app.justfuelnutrition.co.za || true
+          command -v dig >/dev/null && dig +noall +answer app.justfuelnutrition.co.za CNAME A AAAA || true
+          echo '=== HEAD: custom app domain ==='
+          curl -sSIL --max-time 20 https://app.justfuelnutrition.co.za/ | sed -n '1,80p' || true
+          echo '=== HTML markers: custom app domain ==='
+          curl -sSL --max-time 20 https://app.justfuelnutrition.co.za/ -o /tmp/jf-custom.html || true
+          grep -Eio 'Train\. Fuel\. Sorted\.|Plan|Learn|More|Home|Race|FUEL SMART|jfapp=[0-9]+' /tmp/jf-custom.html | head -40 || true
+          echo '=== First 40 lines: custom app domain ==='
+          sed -n '1,40p' /tmp/jf-custom.html || true
+          echo '=== DNS: just-fuel-app.vercel.app ==='
+          getent ahosts just-fuel-app.vercel.app || true
+          echo '=== HEAD: Vercel project domain ==='
+          curl -sSIL --max-time 20 https://just-fuel-app.vercel.app/ | sed -n '1,80p' || true
+          echo '=== HTML markers: Vercel project domain ==='
+          curl -sSL --max-time 20 https://just-fuel-app.vercel.app/ -o /tmp/jf-vercel.html || true
+          grep -Eio 'Train\. Fuel\. Sorted\.|Plan|Learn|More|Home|Race|FUEL SMART|jfapp=[0-9]+' /tmp/jf-vercel.html | head -40 || true
+          echo '=== First 40 lines: Vercel project domain ==='
+          sed -n '1,40p' /tmp/jf-vercel.html || true
