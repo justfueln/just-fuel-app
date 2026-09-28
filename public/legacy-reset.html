@@ -20,27 +20,26 @@
     <div class="brand">JUST FUEL</div>
     <div class="sub">FUEL SMART • TRAIN HARD</div>
     <h1>Updating your app…</h1>
-    <div class="copy">Removing the retired Just Fuel app shell and loading the current Training, Race and Fuel experience.</div>
+    <div class="copy">Removing the retired app shell and switching this device to the current Training, Race and Fuel app.</div>
     <div class="bar"><span></span></div>
-    <div class="small">This should only happen once.</div>
+    <div class="small">Please keep this screen open for a few seconds.</div>
   </main>
   <script>
-    (async function resetLegacyPwa(){
-      const RESET_ID='20260928a';
-      try{
-        document.cookie=`jf_current_shell=${RESET_ID}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
-      }catch{}
+    (async function forceCurrentShell(){
+      const VERSION='15';
+      const COOKIE='jf_shell_v15';
+      const CURRENT=`/current?jfapp=${VERSION}&legacy=cleared`;
+      let finished=false;
 
-      try{
-        if('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations){
-          const registrations=await navigator.serviceWorker.getRegistrations();
-          await Promise.all(registrations.map(async registration=>{
-            try{registration.waiting?.postMessage('JF_RETIRE_LEGACY')}catch{}
-            try{registration.active?.postMessage('JF_RETIRE_LEGACY')}catch{}
-            try{return await registration.unregister()}catch{return false}
-          }));
-        }
-      }catch{}
+      const goCurrent=()=>{
+        if(finished) return;
+        finished=true;
+        window.location.replace(`${CURRENT}&t=${Date.now()}`);
+      };
+
+      try{document.cookie=`${COOKIE}=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure`}catch{}
+      try{localStorage.removeItem('just-fuel-last-section')}catch{}
+      try{sessionStorage.removeItem('jf-open-basket-after-reload')}catch{}
 
       try{
         if('caches' in window && caches.keys){
@@ -49,11 +48,40 @@
         }
       }catch{}
 
-      try{localStorage.removeItem('just-fuel-last-section')}catch{}
-      try{sessionStorage.removeItem('jf-open-basket-after-reload')}catch{}
+      if(!('serviceWorker' in navigator)){
+        goCurrent();
+        return;
+      }
 
-      const target=`/?jfapp=14&legacy=reset&reset_id=${RESET_ID}&t=${Date.now()}`;
-      window.location.replace(target);
+      // Do NOT unregister the old worker first. A worker can remain in control
+      // of an already-open Android PWA window after unregister(). Instead we
+      // replace it with the v15 retirement worker, let that worker claim this
+      // client, purge caches and navigate every open window to /current.
+      try{
+        navigator.serviceWorker.addEventListener('controllerchange',()=>{
+          setTimeout(goCurrent,150);
+        },{once:true});
+
+        const registration=await navigator.serviceWorker.register('/sw.js?retire=15',{
+          scope:'/',
+          updateViaCache:'none'
+        });
+        try{await registration.update()}catch{}
+        try{registration.waiting?.postMessage('JF_FORCE_ACTIVATE')}catch{}
+        try{registration.installing?.postMessage('JF_FORCE_ACTIVATE')}catch{}
+      }catch{}
+
+      // Safety fallback. CacheStorage has already been cleared, so even an
+      // unusually stubborn older worker cannot serve its old cached index.
+      setTimeout(async()=>{
+        try{
+          if('caches' in window && caches.keys){
+            const names=await caches.keys();
+            await Promise.all(names.map(name=>caches.delete(name).catch(()=>false)));
+          }
+        }catch{}
+        goCurrent();
+      },6500);
     })();
   </script>
 </body>
