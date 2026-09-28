@@ -47,9 +47,34 @@ jobs:
           grep -q 'just-fuel-current-v16' dist/manifest.webmanifest
           grep -q "CURRENT_APP_VERSION = '16'" dist/sw.js
 
+  browser-regression:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build production app
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser regression tests
+        run: npm run test:e2e
+
   production-smoke:
     if: github.event_name == 'push'
-    needs: build-and-test
+    needs: [build-and-test, browser-regression]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
