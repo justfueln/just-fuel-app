@@ -5,7 +5,7 @@ let cache=[],cacheAt=0,pending=null,queued=false;
 
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
 function fmtPace(sec){const n=Math.round(Number(sec)||0);if(!n)return'';return`${Math.floor(n/60)}:${String(n%60).padStart(2,'0')}`}
-function sourceLabel(v){return v==='power'?'POWER':v==='heart_rate'?'HEART RATE':v==='pace'?'PACE':'EFFORT'}
+function sourceLabel(v){return v==='power'?'POWER':v==='heart_rate'?'HEART RATE':v==='pace'?'PACE':'RPE'}
 function primaryText(row){
   const metric=row.target_metric||'rpe';
   if(metric==='power'&&row.target_power_low_w&&row.target_power_high_w)return`${row.target_power_low_w}–${row.target_power_high_w} W`;
@@ -16,8 +16,8 @@ function primaryText(row){
 }
 function secondaryText(row){
   const bits=[];
-  if(row.target_metric!=='heart_rate'&&row.target_hr_low&&row.target_hr_high)bits.push(`HR ${row.target_hr_low}–${row.target_hr_high}`);
-  if(row.target_metric!=='rpe'&&row.target_rpe_low!=null&&row.target_rpe_high!=null)bits.push(`RPE ${row.target_rpe_low}–${row.target_rpe_high}`);
+  if(row.target_metric!=='heart_rate'&&row.target_hr_low&&row.target_hr_high)bits.push(`HR ${row.target_hr_low}–${row.target_hr_high} bpm`);
+  if(row.target_metric!=='rpe'&&row.target_rpe_low!=null&&row.target_rpe_high!=null)bits.push(`RPE ${row.target_rpe_low}–${row.target_rpe_high}/10`);
   return bits.join(' · ');
 }
 async function rows(force=false){
@@ -32,6 +32,7 @@ async function rows(force=false){
   return pending;
 }
 function inject(card,row){
+  card.dataset.jfTargetMetric=row.target_metric||'rpe';
   if(card.querySelector('.jf-session-target-summary'))return;
   const wrap=document.createElement('div');wrap.className='jf-session-target-summary';
   const label=document.createElement('span');label.textContent=sourceLabel(row.target_metric||'rpe');
@@ -41,13 +42,27 @@ function inject(card,row){
   if(row.target_metric_note)wrap.title=row.target_metric_note;
   const fuel=card.querySelector('.fuel-summary');if(fuel)card.insertBefore(wrap,fuel);else card.append(wrap);
 }
+function repairWorkoutStepTargets(){
+  document.querySelectorAll('.training-page .session-card[data-jf-target-metric]').forEach(card=>{
+    const metric=card.dataset.jfTargetMetric||'rpe';if(metric==='power')return;
+    const primary=card.querySelector('.jf-session-target-summary strong')?.textContent?.trim();if(!primary)return;
+    card.querySelectorAll('.workout-step-row').forEach(row=>{
+      const name=(row.querySelector('.workout-step-top strong')?.textContent||'').toLowerCase();
+      const target=row.querySelector('.workout-step-target');if(!target)return;
+      if(name.includes('warm up')||name.includes('warm-up')||name.includes('cool down')||name.includes('cool-down'))target.textContent='Easy · RPE 2–3/10';
+      else if(name.includes('recovery')||name.includes('rest'))target.textContent='Easy recovery';
+      else target.textContent=primary;
+    });
+  });
+}
 async function scan(force=false){
   const cards=[...document.querySelectorAll('.training-page .session-card')];if(!cards.length)return;
   const data=await rows(force);const used=new Set();
-  for(const card of cards){if(card.querySelector('.jf-session-target-summary'))continue;const title=(card.querySelector('h3')?.textContent||'').trim(),date=(card.querySelector('.eyebrow')?.textContent||'').trim();const row=data.find(r=>!used.has(r.id)&&String(r.title||'').trim()===title&&fmtDate(r.session_date)===date);if(row){used.add(row.id);inject(card,row)}}
+  for(const card of cards){const title=(card.querySelector('h3')?.textContent||'').trim(),date=(card.querySelector('.eyebrow')?.textContent||'').trim();const row=data.find(r=>!used.has(r.id)&&String(r.title||'').trim()===title&&fmtDate(r.session_date)===date);if(row){used.add(row.id);inject(card,row)}}
+  repairWorkoutStepTargets();
 }
 function queue(){if(queued)return;queued=true;setTimeout(()=>{queued=false;scan().catch(()=>{})},120)}
-function reset(){cache=[];cacheAt=0;pending=null;document.querySelectorAll('.jf-session-target-summary').forEach(x=>x.remove());queue()}
+function reset(){cache=[];cacheAt=0;pending=null;document.querySelectorAll('.jf-session-target-summary').forEach(x=>x.remove());document.querySelectorAll('.training-page .session-card').forEach(x=>delete x.dataset.jfTargetMetric);queue()}
 if(typeof window!=='undefined'){
   window.addEventListener('jf-training-plan-updated',reset);
   window.addEventListener('jf-strava-synced',reset);
