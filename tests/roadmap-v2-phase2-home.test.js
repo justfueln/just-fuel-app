@@ -29,8 +29,8 @@ test('Home shows fuel, race and stock as daily priorities without duplicating ma
 
 test('stock forecast never blocks the first Home dashboard',async()=>{
   const home=await source(homeUrl);
-  const firstPaint=home.indexOf('setLoading(false)');
-  const forecast=home.indexOf('fetchTrainingFuelForecast');
+  const firstPaint=home.indexOf('setLoading(false);\n\n    // Stock');
+  const forecast=home.indexOf('fetchTrainingFuelForecast(supabase,current.user.id)');
   assert.ok(firstPaint>=0&&forecast>=0&&firstPaint<forecast);
   assert.match(home,/must never delay first paint/);
 });
