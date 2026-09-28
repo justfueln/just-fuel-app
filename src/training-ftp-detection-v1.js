@@ -25,8 +25,11 @@ async function confirmFtp(value,note){
   if(!Number.isFinite(watts)||watts<80||watts>700)throw new Error('Enter a confirmed FTP between 80 and 700 W.');
   const{data,error}=await sb.rpc('confirm_training_ftp',{p_ftp_w:watts,p_note:note||null});
   if(error)throw error;
+  const{data:{session}}=await sb.auth.getSession();
+  if(session?.user){try{await sb.rpc('refresh_training_achievements',{p_user_id:session.user.id})}catch{}}
   cache=null;cacheAt=0;
   window.dispatchEvent(new CustomEvent('jf-training-plan-updated',{detail:{source:'ftp-confirmed',result:data}}));
+  window.dispatchEvent(new CustomEvent('jf-training-achievements-refresh',{detail:{source:'ftp-confirmed'}}));
   return data;
 }
 
