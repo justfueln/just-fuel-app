@@ -39,6 +39,7 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
   const[forecastReady,setForecastReady]=useState(false);
   const[stock,setStock]=useState([]);
   const[fuelProfile,setFuelProfile]=useState(null);
+  const[moreOpen,setMoreOpen]=useState(false);
   const mountedRef=useRef(true);
   const autoLoadedUserRef=useRef('');
   const loadPromiseRef=useRef(null);
@@ -91,7 +92,7 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
 
   function go(next){
     const id=normalizeFuelView(next);
-    setView(id);onViewChange?.(id);
+    setMoreOpen(false);setView(id);onViewChange?.(id);
     window.history.pushState({...window.history.state,jfSection:'fuel',jfFuelView:id,jfBasket:false},'',window.location.href);
     window.scrollTo({top:0,behavior:'auto'});
   }
@@ -102,6 +103,8 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
   const weekTotals=useMemo(()=>tallySessions(week),[week]);
   const weekShortfalls=useMemo(()=>forecastReady?restockShortfalls(forecast.filter(x=>Number(x.horizon_days)===7)):({}),[forecast,forecastReady]);
   const shortfallUnits=useMemo(()=>forecastReady?orderUnits(weekShortfalls):0,[weekShortfalls,forecastReady]);
+  const primaryFuelNav=useMemo(()=>FUEL_NAV.filter(item=>item.group==='primary'),[]);
+  const secondaryFuelNav=useMemo(()=>FUEL_NAV.filter(item=>item.group==='more'),[]);
 
   if(view==='planner')return <FuelPageFrame title="Quick Fuel Planner" subtitle="Build a simple session fuel plan." onBack={back}><FuelBuilder addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
   if(view==='review')return <FuelPageFrame title="Fuel Review" subtitle="Compare planned fuel with what you actually used." onBack={back}><TrainingFuelReview/></FuelPageFrame>;
@@ -127,8 +130,12 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
     </section>}
 
     <div className="fuel-v2-menu">
-      {FUEL_NAV.filter(item=>item.id!=='home').map(item=><FuelMenuCard key={item.id} item={item} onClick={()=>go(item.id)} locked={item.requiresLogin&&!session?.user}/>) }
+      {primaryFuelNav.map(item=><FuelMenuCard key={item.id} item={item} onClick={()=>go(item.id)} locked={item.requiresLogin&&!session?.user}/>)}
+      <button type="button" className="fuel-v2-menu-card fuel-v2-more-toggle" aria-expanded={moreOpen} onClick={()=>setMoreOpen(v=>!v)}>
+        <span><SlidersHorizontal size={20}/></span><div><strong>More tools</strong><small>Fuel review, cupboard stock and order shortfalls.</small></div><ChevronRight size={19}/>
+      </button>
     </div>
+    {moreOpen&&<div className="fuel-v2-more-panel" aria-label="More fuel tools">{secondaryFuelNav.map(item=><FuelMenuCard key={item.id} item={item} onClick={()=>go(item.id)} locked={item.requiresLogin&&!session?.user}/>)}</div>}
   </div>;
 }
 

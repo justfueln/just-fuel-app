@@ -9,31 +9,32 @@ export const APP_ROUTES={
 export const BOTTOM_NAV=['home','training','race','fuel','shop'];
 export const MAIN_ROUTE_IDS=BOTTOM_NAV.slice();
 
+// Roadmap V2: keep everyday choices visible and progressively disclose specialist views.
 export const TRAINING_NAV=[
-  {id:'plan',label:'Plan',legacyTab:'My Plan',subView:null},
-  {id:'history',label:'History',legacyTab:'History',subView:'History'},
-  {id:'performance',label:'Performance',legacyTab:'History',subView:'Performance'},
-  {id:'review',label:'Review',legacyTab:'History',subView:'Compare'}
+  {id:'plan',label:'Plan',legacyTab:'My Plan',subView:null,group:'primary'},
+  {id:'history',label:'History',legacyTab:'History',subView:'History',group:'primary'},
+  {id:'performance',label:'Performance',legacyTab:'History',subView:'Performance',group:'more'},
+  {id:'review',label:'Review',legacyTab:'History',subView:'Compare',group:'more'}
 ];
 
 export const RACE_NAV=[
-  {id:'races',label:'My Races'},
-  {id:'registry',label:'Event Registry'},
-  {id:'overview',label:'Overview'},
-  {id:'stages',label:'Stages',stageOnly:true},
-  {id:'stage',label:'Stage',stageOnly:true,detail:true},
-  {id:'fuel',label:'Fuel & Hydration'},
-  {id:'water',label:'Water Points'},
-  {id:'checklist',label:'Checklist'}
+  {id:'races',label:'My Races',group:'root'},
+  {id:'registry',label:'Event Registry',group:'action'},
+  {id:'overview',label:'Overview',group:'primary'},
+  {id:'stages',label:'Stages',stageOnly:true,group:'more'},
+  {id:'stage',label:'Stage',stageOnly:true,detail:true,group:'detail'},
+  {id:'fuel',label:'Fuel & Hydration',group:'primary'},
+  {id:'water',label:'Water Points',group:'more'},
+  {id:'checklist',label:'Checklist',group:'more'}
 ];
 
 export const FUEL_NAV=[
-  {id:'home',label:'Fuel Home',copy:'Your next-week fuel requirement and stock status.'},
-  {id:'planner',label:'Quick Fuel Planner',copy:'Build a simple fuel plan for any ride or session.'},
-  {id:'training',label:'Training Fuel',copy:'See exactly what your upcoming training plan requires.',requiresLogin:true},
-  {id:'review',label:'Fuel Review',copy:'Compare planned intake with what you actually consumed.',requiresLogin:true},
-  {id:'stock',label:'My Stock',copy:'Keep your Just Fuel cupboard quantities up to date.',requiresLogin:true},
-  {id:'order',label:'Order Needed',copy:'See only the shortfall for the next 7, 14 or 30 days.',requiresLogin:true}
+  {id:'home',label:'Fuel Home',copy:'Your next-week fuel requirement and stock status.',group:'root'},
+  {id:'planner',label:'Quick Fuel Planner',copy:'Build a simple fuel plan for any ride or session.',group:'primary'},
+  {id:'training',label:'Training Fuel',copy:'See exactly what your upcoming training plan requires.',requiresLogin:true,group:'primary'},
+  {id:'review',label:'Fuel Review',copy:'Compare planned intake with what you actually consumed.',requiresLogin:true,group:'more'},
+  {id:'stock',label:'My Stock',copy:'Keep your Just Fuel cupboard quantities up to date.',requiresLogin:true,group:'more'},
+  {id:'order',label:'Order Needed',copy:'See only the shortfall for the next 7, 14 or 30 days.',requiresLogin:true,group:'more'}
 ];
 
 export function normalizeFuelView(value){
@@ -42,12 +43,12 @@ export function normalizeFuelView(value){
 }
 
 export const PROFILE_NAV=[
-  {id:'home',label:'Profile & Settings'},
-  {id:'details',label:'Athlete Details'},
-  {id:'connections',label:'Strava & Connections'},
-  {id:'reminders',label:'Reminders'},
-  {id:'learn',label:'Learn'},
-  {id:'install',label:'Install & Help'}
+  {id:'home',label:'Profile & Settings',group:'root'},
+  {id:'details',label:'Athlete Details',group:'primary'},
+  {id:'connections',label:'Strava & Connections',group:'primary'},
+  {id:'reminders',label:'Reminders',group:'more'},
+  {id:'learn',label:'Learn',group:'more'},
+  {id:'install',label:'Install & Help',group:'more'}
 ];
 
 export const TRAINING_VIEWS=[
