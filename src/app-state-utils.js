@@ -1,4 +1,4 @@
-import {MAIN_ROUTE_IDS,TRAINING_TABS,normalizeMainRoute,normalizeTrainingLegacy} from './navigation-registry';
+import {MAIN_ROUTE_IDS,TRAINING_TABS,normalizeMainRoute,normalizeTrainingLegacy} from './navigation-registry.js';
 
 export const MAIN_SECTIONS=MAIN_ROUTE_IDS;
 export {TRAINING_TABS};
