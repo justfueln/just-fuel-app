@@ -5,6 +5,7 @@ import {readFile} from 'node:fs/promises';
 const profileUrl=new URL('../src/ProfileHub.jsx',import.meta.url);
 const apiUrl=new URL('../src/training-api.js',import.meta.url);
 const mainUrl=new URL('../src/main.jsx',import.meta.url);
+const routeEnhancementsUrl=new URL('../src/route-enhancements.js',import.meta.url);
 const targetsUrl=new URL('../src/training-multisport-targets-v1.js',import.meta.url);
 const detailsUrl=new URL('../src/training-workout-details.js',import.meta.url);
 const performanceUrl=new URL('../src/TrainingPerformance.jsx',import.meta.url);
@@ -54,10 +55,13 @@ test('Strava sync reruns adaptive plan and progression before target refresh',as
   assert.match(source,/progression:progression\.data\|\|null/);
 });
 
-test('current shell loads multisport workout target enhancement after first paint',async()=>{
-  const source=await readFile(mainUrl,'utf8');
-  assert.match(source,/training-multisport-targets-v1\.css/);
-  assert.match(source,/import\('\.\/training-multisport-targets-v1'\)/);
+test('current shell loads multisport workout target enhancement only when Training opens',async()=>{
+  const main=await readFile(mainUrl,'utf8');
+  const loader=await readFile(routeEnhancementsUrl,'utf8');
+  assert.match(main,/training-multisport-targets-v1\.css/);
+  assert.doesNotMatch(main,/import\('\.\/training-multisport-targets-v1'\)/);
+  assert.match(loader,/section==='training'/);
+  assert.match(loader,/import\('\.\/training-multisport-targets-v1'\)/);
 });
 
 test('workout cards can display power heart rate pace or RPE targets',async()=>{
