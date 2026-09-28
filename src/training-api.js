@@ -128,6 +128,17 @@ export async function verifyTrainingOtp(client,email,token){
 
 export async function syncTrainingStrava(client){
   const result=await client.functions.invoke('strava-sync',{body:{}});
+  if(!result.error){
+    try{
+      const auth=await client.auth.getSession();
+      const uid=auth.data.session?.user?.id;
+      if(uid){
+        const detection=await client.rpc('refresh_training_sport_detection',{p_user_id:uid});
+        const targets=await client.rpc('refresh_training_session_targets',{p_user_id:uid});
+        result.data={...(result.data||{}),sport_detection:detection.data||null,sport_detection_warning:detection.error?.message||null,session_targets:targets.data||null,session_targets_warning:targets.error?.message||null};
+      }
+    }catch{}
+  }
   if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('jf-strava-synced',{detail:result?.data||null}));
   return result;
 }
