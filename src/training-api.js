@@ -96,11 +96,11 @@ export async function fetchTrainingFuelForecast(client,userId){
 }
 
 export async function fetchTrainingHistory(client,userId){
-  const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,effective_average_heartrate,effective_max_heartrate,effective_average_cadence,effective_average_watts,effective_weighted_average_watts,effective_kilojoules,effective_calories,trainer,manual,had_duplicate,duplicate_confidence,synced_at';
+  const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,effective_average_heartrate,effective_max_heartrate,effective_average_cadence,effective_average_watts,effective_weighted_average_watts,effective_kilojoules,effective_calories,trainer,manual,had_duplicate,duplicate_confidence,synced_at,estimated_training_load,load_source,load_confidence,sport_family';
   const rows=[];
   const pageSize=500;
   for(let from=0;;from+=pageSize){
-    const result=await client.from('strava_activities_analysis').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).range(from,from+pageSize-1);
+    const result=await client.from('training_activity_metrics').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).range(from,from+pageSize-1);
     if(result.error)return{history:[],error:result.error};
     const page=(result.data||[]).map(row=>({
       ...row,
@@ -110,7 +110,8 @@ export async function fetchTrainingHistory(client,userId){
       average_watts:row.effective_average_watts,
       weighted_average_watts:row.effective_weighted_average_watts,
       kilojoules:row.effective_kilojoules,
-      calories:row.effective_calories
+      calories:row.effective_calories,
+      raw:{suffer_score:Number(row.estimated_training_load)||0,jf_load_source:row.load_source,jf_load_confidence:row.load_confidence}
     }));
     rows.push(...page);
     if(page.length<pageSize)break;
