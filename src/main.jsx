@@ -64,7 +64,7 @@ import './race-goal-progress-v1';
 import './race-fuel-rehearsal-v1';
 import './app-analytics';
 
-const CURRENT_APP_VERSION='14';
+const CURRENT_APP_VERSION='15';
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -72,45 +72,74 @@ export const supabase = createClient(
   { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }
 );
 
-async function purgeLegacyPwa(){
+async function deleteLegacyCaches(){
   try{
-    let registrations=[];
-    let cacheNames=[];
-    const hadController=Boolean(navigator.serviceWorker?.controller);
+    if(!('caches' in window) || !caches.keys) return [];
+    const names=await caches.keys();
+    await Promise.all(names.map(name=>caches.delete(name).catch(()=>false)));
+    return names;
+  }catch{
+    return [];
+  }
+}
 
-    if('serviceWorker' in navigator && navigator.serviceWorker.getRegistrations){
-      registrations=await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(async reg=>{
-        try{reg.waiting?.postMessage('JF_RETIRE_LEGACY')}catch{}
-        try{reg.active?.postMessage('JF_RETIRE_LEGACY')}catch{}
-        try{return await reg.unregister()}catch{return false}
-      }));
-    }
+async function handOffLegacyWorker(){
+  if(!('serviceWorker' in navigator)){
+    await deleteLegacyCaches();
+    return false;
+  }
 
-    if('caches' in window && caches.keys){
-      cacheNames=await caches.keys();
-      await Promise.all(cacheNames.map(name=>caches.delete(name).catch(()=>false)));
-    }
+  const url=new URL(window.location.href);
+  const alreadyCleared=url.searchParams.get('legacy')==='cleared'&&url.searchParams.get('jfapp')===CURRENT_APP_VERSION;
 
-    return registrations.length>0 || cacheNames.length>0 || hadController;
+  let registrations=[];
+  try{registrations=await navigator.serviceWorker.getRegistrations()}catch{}
+  const hasController=Boolean(navigator.serviceWorker.controller);
+
+  await deleteLegacyCaches();
+
+  // If the v15 retirement worker has already moved this page to /current,
+  // it is safe to unregister it. An already-controlled page may keep the
+  // worker until the next navigation, but v15 has no fetch handler and cannot
+  // serve an old application shell.
+  if(alreadyCleared){
+    Promise.all(registrations.map(reg=>reg.unregister().catch(()=>false))).catch(()=>{});
+    return false;
+  }
+
+  if(!registrations.length&&!hasController) return false;
+
+  // Critical: do not unregister an old worker before replacement. Android can
+  // leave the old worker controlling an installed PWA window even after
+  // unregister(). Replace it first with the network-only retirement worker.
+  try{
+    const retirement=await navigator.serviceWorker.register('/sw.js?retire=15',{
+      scope:'/',
+      updateViaCache:'none'
+    });
+    try{await retirement.update()}catch{}
+    try{retirement.waiting?.postMessage('JF_FORCE_ACTIVATE')}catch{}
+    try{retirement.installing?.postMessage('JF_FORCE_ACTIVATE')}catch{}
+
+    // The retirement worker normally claims and navigates this window itself.
+    // Keep a network-only fallback in case a browser delays activation.
+    window.setTimeout(async()=>{
+      await deleteLegacyCaches();
+      const current=new URL('/current',window.location.origin);
+      current.searchParams.set('jfapp',CURRENT_APP_VERSION);
+      current.searchParams.set('legacy','cleared');
+      current.searchParams.set('fallback','1');
+      current.searchParams.set('t',String(Date.now()));
+      window.location.replace(current.toString());
+    },6500);
+    return true;
   }catch(error){
-    console.warn('Legacy Just Fuel PWA cleanup failed:',error);
+    console.warn('Legacy Just Fuel PWA takeover failed:',error);
     return false;
   }
 }
 
-async function boot(){
-  const cleaned=await purgeLegacyPwa();
-  const url=new URL(window.location.href);
-  const alreadyCleared=url.searchParams.get('legacy')==='cleared'&&url.searchParams.get('jfapp')===CURRENT_APP_VERSION;
-
-  if(cleaned&&!alreadyCleared){
-    url.searchParams.set('jfapp',CURRENT_APP_VERSION);
-    url.searchParams.set('legacy','cleared');
-    window.location.replace(`${url.pathname}${url.search}${url.hash}`);
-    return;
-  }
-
+function renderApp(){
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <ErrorBoundary>
@@ -119,6 +148,12 @@ async function boot(){
       </ErrorBoundary>
     </React.StrictMode>
   );
+}
+
+async function boot(){
+  const handingOff=await handOffLegacyWorker();
+  if(handingOff) return;
+  renderApp();
 }
 
 boot();
