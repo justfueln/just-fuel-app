@@ -22,9 +22,9 @@ async function load(force=false){
     const since=new Date(Date.now()-90*86400000).toISOString();
     const[a,c]=await Promise.all([
       sb.from('training_achievements').select('id,achievement_key,achievement_type,title,message,metric_label,value_num,previous_value_num,unit,activity_id,activity_date,source,metadata,seen_at,created_at').eq('user_id',uid).gte('created_at',since).order('created_at',{ascending:false}).limit(30),
-      sb.from('training_session_completion').select('session_id,title,session_date,actual_strava_activity_id,completion_status').eq('user_id',uid).gte('session_date',new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order('session_date',{ascending:false})
+      sb.from('training_plan_calendar_with_fuel').select('id,title,session_date,actual_strava_activity_id,status').eq('user_id',uid).gte('session_date',new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order('session_date',{ascending:false})
     ]);
-    achievements=a.data||[];completionRows=c.data||[];cacheAt=Date.now();return{achievements,completionRows};
+    achievements=a.data||[];completionRows=(c.data||[]).map(x=>({...x,session_id:x.id}));cacheAt=Date.now();return{achievements,completionRows};
   })().finally(()=>{loading=null});
   return loading;
 }
