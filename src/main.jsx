@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import ShellNextV3 from './ShellNextV3';
 import ErrorBoundary from './ErrorBoundary';
 import NetworkStatus from './NetworkStatus';
+import {installAppUpdateWatcher} from './app-update';
+import {loadGlobalEnhancements} from './route-enhancements';
 import './styles.css';
 import './shell-next.css';
 import './shell-v3.css';
@@ -50,7 +52,6 @@ import './race-fuel-rehearsal-v1.css';
 
 const CURRENT_APP_VERSION='16';
 const PWA_CLEAN_KEY=`jf-pwa-clean-v${CURRENT_APP_VERSION}`;
-let enhancementsScheduled=false;
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -97,7 +98,6 @@ async function handOffLegacyWorker(){
     return false;
   }
 
-  // Once the old PWA is gone, never clear CacheStorage on every normal launch.
   if(!registrations.length&&!hasController){
     if(!pwaAlreadyClean())markPwaClean();
     return false;
@@ -127,47 +127,6 @@ async function handOffLegacyWorker(){
   }
 }
 
-function loadEnhancements(){
-  if(enhancementsScheduled)return;
-  enhancementsScheduled=true;
-
-  const run=async()=>{
-    await Promise.all([
-      import('./basketBridge'),
-      import('./training-boost-control'),
-      import('./training-workout-details'),
-      import('./training-multisport-targets-v1'),
-      import('./training-simple-flow-v4'),
-      import('./training-feedback'),
-      import('./training-coach-v1'),
-      import('./training-weather-v1'),
-      import('./training-coach-review-v1'),
-      import('./training-adaptive-v1'),
-      import('./training-readiness-v1'),
-      import('./training-week-learning-v1'),
-      import('./training-progression-v1'),
-      import('./training-ftp-detection-v1'),
-      import('./training-power-curve-v1'),
-      import('./training-achievements-v1')
-    ]);
-
-    await import('./race-addon-stability');
-    await Promise.all([
-      import('./race-goal-progress-v1'),
-      import('./race-fuel-rehearsal-v1'),
-      import('./race-week-execution-v1'),
-      import('./app-analytics')
-    ]);
-  };
-
-  const start=()=>run().catch(error=>console.warn('Deferred Just Fuel enhancements failed:',error));
-  if('requestIdleCallback' in window){
-    window.requestIdleCallback(start,{timeout:1200});
-  }else{
-    window.setTimeout(start,180);
-  }
-}
-
 function renderApp(){
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
@@ -182,9 +141,11 @@ function renderApp(){
 function boot(){
   try{document.cookie='jf_shell_v16=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
 
-  // First paint must never wait for legacy PWA cleanup or optional enhancements.
+  // Keep first paint lean. Global helpers load only after the shell is visible,
+  // while Training/Race enhancements are now loaded only when those sections open.
   renderApp();
-  loadEnhancements();
+  loadGlobalEnhancements();
+  installAppUpdateWatcher();
 
   // Retire any old service worker after the current shell is already visible.
   window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},0);
