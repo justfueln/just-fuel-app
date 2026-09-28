@@ -50,6 +50,7 @@ import './training-achievements-v1.css';
 import './race-goal-progress-v1.css';
 import './race-fuel-rehearsal-v1.css';
 
+const AthleteOnboardingGate=React.lazy(()=>import('./AthleteOnboardingGate'));
 const CURRENT_APP_VERSION='16';
 const PWA_CLEAN_KEY=`jf-pwa-clean-v${CURRENT_APP_VERSION}`;
 
@@ -127,12 +128,29 @@ async function handOffLegacyWorker(){
   }
 }
 
+function DeferredOnboarding(){
+  const[ready,setReady]=React.useState(false);
+  React.useEffect(()=>{
+    let cancelled=false;
+    const start=()=>{if(!cancelled)setReady(true)};
+    if('requestIdleCallback' in window){
+      const id=window.requestIdleCallback(start,{timeout:900});
+      return()=>{cancelled=true;try{window.cancelIdleCallback?.(id)}catch{}};
+    }
+    const id=window.setTimeout(start,350);
+    return()=>{cancelled=true;window.clearTimeout(id)};
+  },[]);
+  if(!ready)return null;
+  return <React.Suspense fallback={null}><AthleteOnboardingGate/></React.Suspense>;
+}
+
 function renderApp(){
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <ErrorBoundary>
         <NetworkStatus />
         <ShellNextV3 />
+        <DeferredOnboarding />
       </ErrorBoundary>
     </React.StrictMode>
   );
@@ -142,7 +160,7 @@ function boot(){
   try{document.cookie='jf_shell_v16=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
 
   // Keep first paint lean. Global helpers load only after the shell is visible,
-  // while Training/Race enhancements are now loaded only when those sections open.
+  // while Training/Race enhancements and onboarding are loaded after first paint.
   renderApp();
   loadGlobalEnhancements();
   installAppUpdateWatcher();
