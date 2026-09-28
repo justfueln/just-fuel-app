@@ -9,6 +9,7 @@ function el(tag,cls,text){const n=document.createElement(tag);if(cls)n.className
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
 function label(v){return v==='progress'?'PROGRESS':v==='hold'?'HOLD':v==='protect'?'PROTECT':'BASELINE'}
 function title(v){return v==='progress'?'Coach progressed this workout':v==='hold'?'Progression held for now':v==='protect'?'Recovery load protected':'Building progression evidence'}
+function evaluated(row){return Boolean(row?.progression_applied_at||row?.progression_reason)}
 
 async function load(force=false){
   if(!force&&cache&&Date.now()-cacheAt<45000)return cache;
@@ -38,7 +39,7 @@ function isPlanOpen(){
 function renderSummary(data){
   const main=document.querySelector('.training-page .app-shell main');const stack=main?.querySelector(':scope > .stack');if(!stack)return;
   stack.querySelector('.jf-progression-summary')?.remove();
-  const upcoming=data.rows.filter(r=>r.progression_status);
+  const upcoming=data.rows.filter(evaluated);
   if(!upcoming.length)return;
   const progressed=upcoming.filter(r=>r.progression_status==='progress').length;
   const held=upcoming.filter(r=>r.progression_status==='hold'||r.progression_status==='protect').length;
@@ -53,7 +54,7 @@ function renderSummary(data){
 }
 
 function renderCard(card,row){
-  if(card.dataset.jfProgression==='1')return;card.dataset.jfProgression='1';
+  if(!evaluated(row)||card.dataset.jfProgression==='1')return;card.dataset.jfProgression='1';
   const box=el('div',`jf-progression jf-progression-${row.progression_status||'baseline'}`);
   const top=el('div','jf-progression-top');top.append(el('span','','PROGRESSION COACH'),el('b','',label(row.progression_status)));box.append(top);
   box.append(el('strong','',title(row.progression_status)),el('p','',row.progression_reason||'The coach is monitoring this workout before changing the progression.'));
@@ -73,7 +74,7 @@ async function scan(force=false){
   const cards=[...document.querySelectorAll('.training-page .session-card')];const used=new Set();
   for(const card of cards){
     const t=(card.querySelector('h3')?.textContent||'').trim(),d=(card.querySelector('.eyebrow')?.textContent||'').trim();
-    const row=data.rows.find(r=>!used.has(r.id)&&String(r.title||'').trim()===t&&fmtDate(r.session_date)===d);if(!row)continue;used.add(row.id);renderCard(card,row);
+    const row=data.rows.find(r=>evaluated(r)&&!used.has(r.id)&&String(r.title||'').trim()===t&&fmtDate(r.session_date)===d);if(!row)continue;used.add(row.id);renderCard(card,row);
   }
 }
 function reset(){cache=null;cacheAt=0;document.querySelector('.jf-progression-summary')?.remove();document.querySelectorAll('.session-card[data-jf-progression="1"]').forEach(c=>{c.dataset.jfProgression='';c.querySelector('.jf-progression')?.remove()})}
