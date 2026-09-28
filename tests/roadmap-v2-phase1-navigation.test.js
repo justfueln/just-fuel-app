@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 const registryUrl=new URL('../src/navigation-registry.js',import.meta.url);
 const shellUrl=new URL('../src/ShellNextV3.jsx',import.meta.url);
 const fuelUrl=new URL('../src/FuelHubV2.jsx',import.meta.url);
-const raceUrl=new URL('../src/RaceHubV2.jsx',import.meta.url);
+const racePhase4Url=new URL('../src/race-roadmap-phase4.js',import.meta.url);
 
 test('bottom navigation remains Home, Training, Race, Fuel, Shop',async()=>{
   const source=await readFile(registryUrl,'utf8');
@@ -31,8 +31,11 @@ test('Fuel exposes Quick Planner and Training Fuel directly, with secondary tool
   assert.match(fuel,/fuel-v2-more-panel/);
 });
 
-test('Race keeps its secondary race sections inside a single Race menu control',async()=>{
-  const race=await readFile(raceUrl,'utf8');
-  assert.match(race,/className="race-v2-menu"/);
-  assert.match(race,/<select value=\{value\}/);
+test('Race exposes only Race Plan, Fuel and Checklist as primary race actions',async()=>{
+  const registry=await import(`${registryUrl.href}?race=${Date.now()}`);
+  assert.deepEqual(registry.RACE_NAV.filter(x=>x.group==='primary').map(x=>x.id),['plan','fuel','checklist']);
+  assert.deepEqual(registry.RACE_NAV.filter(x=>x.group==='plan').map(x=>x.id),['stages','water']);
+  const race=await readFile(racePhase4Url,'utf8');
+  assert.match(race,/aria-label','Race sections'/);
+  assert.match(race,/\['plan','Race Plan'\],\['fuel','Fuel'\],\['checklist','Checklist'\]/);
 });
