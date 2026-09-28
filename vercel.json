@@ -1,4 +1,14 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "missing": [
+        { "type": "cookie", "key": "jf_current_shell" }
+      ],
+      "destination": "/legacy-reset.html",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/strava-return", "destination": "/index.html" }
   ],
@@ -19,6 +29,17 @@
         { "key": "Cache-Control", "value": "no-store, no-cache, max-age=0, must-revalidate" },
         { "key": "CDN-Cache-Control", "value": "no-store" },
         { "key": "Vercel-CDN-Cache-Control", "value": "no-store" },
+        { "key": "Pragma", "value": "no-cache" },
+        { "key": "Expires", "value": "0" }
+      ]
+    },
+    {
+      "source": "/legacy-reset.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, max-age=0, must-revalidate" },
+        { "key": "CDN-Cache-Control", "value": "no-store" },
+        { "key": "Vercel-CDN-Cache-Control", "value": "no-store" },
+        { "key": "Clear-Site-Data", "value": "\"cache\"" },
         { "key": "Pragma", "value": "no-cache" },
         { "key": "Expires", "value": "0" }
       ]
