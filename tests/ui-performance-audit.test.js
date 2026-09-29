@@ -33,3 +33,11 @@ test('smart alerts are deferred away from first interaction and route chunks pre
   assert.match(shell,/onTouchStart=\{\(\)=>prefetchRoute\(id\)\}/);
   assert.match(shell,/connection\?\.saveData/);
 });
+
+test('app update polling cannot fire from focus events during the first eight seconds',()=>{
+  const updates=read('src/app-update.js');
+  assert.match(updates,/let armed=false/);
+  assert.match(updates,/const check=\(\)=>armed\?/);
+  assert.match(updates,/armed=true;[\s\S]*checkForAppUpdate\(\{force:true\}\)/);
+  assert.match(updates,/},8000\)/);
+});
