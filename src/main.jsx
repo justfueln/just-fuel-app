@@ -16,6 +16,7 @@ import './navigation-v1.css';
 import './navigation-v2.css';
 import './mobile-ux-audit-v1.css';
 import './mobile-scroll-performance-v1.css';
+import './home-dashboard-v1.css';
 import './training-header-clearance-hotfix.css';
 
 const CURRENT_APP_VERSION='16';
