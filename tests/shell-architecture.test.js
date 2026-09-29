@@ -15,11 +15,13 @@ test('heavy app areas stay route-level lazy loaded',async()=>{
   assert.doesNotMatch(source,/import\s+CheckoutDrawer\s+from\s+['"]\.\/CheckoutDrawer['"]/);
 });
 
-test('Race uses its own app route instead of remounting the legacy Training app',async()=>{
+test('Race uses its own route and Training stays mounted while its subview changes',async()=>{
   const source=await readFile(shellUrl,'utf8');
   assert.match(source,/\{section==='race'&&<RaceApp\/>\}/);
-  assert.match(source,/\{section==='training'&&<TrainingApp\s+key=/);
+  assert.match(source,/\{section==='training'&&<TrainingApp\/>\}/);
+  assert.doesNotMatch(source,/TrainingApp\s+key=/);
   assert.doesNotMatch(source,/\{isTrainingArea&&<TrainingApp/);
+  assert.match(source,/new PopStateEvent\('popstate'/);
 });
 
 test('checkout chunk is not mounted until the basket opens',async()=>{
