@@ -127,6 +127,29 @@ async function handOffLegacyWorker(){
   }
 }
 
+async function mountOnboarding(){
+  if(window.__JF_ONBOARDING_ROOT__)return;
+  let host=document.getElementById('jf-onboarding-root');
+  if(!host){
+    host=document.createElement('div');
+    host.id='jf-onboarding-root';
+    document.body.appendChild(host);
+  }
+  const{default:AthleteOnboardingGate}=await import('./AthleteOnboardingGate');
+  if(window.__JF_ONBOARDING_ROOT__)return;
+  const root=ReactDOM.createRoot(host);
+  window.__JF_ONBOARDING_ROOT__=root;
+  root.render(<ErrorBoundary><AthleteOnboardingGate/></ErrorBoundary>);
+}
+
+function scheduleOnboarding(){
+  if(window.__JF_ONBOARDING_SCHEDULED__)return;
+  window.__JF_ONBOARDING_SCHEDULED__=true;
+  const start=()=>mountOnboarding().catch(error=>console.warn('Athlete onboarding could not load:',error));
+  if('requestIdleCallback' in window)window.requestIdleCallback(start,{timeout:900});
+  else window.setTimeout(start,350);
+}
+
 function renderApp(){
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
@@ -142,10 +165,11 @@ function boot(){
   try{document.cookie='jf_shell_v16=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
 
   // Keep first paint lean. Global helpers load only after the shell is visible,
-  // while Training/Race enhancements are now loaded only when those sections open.
+  // while Training/Race enhancements and onboarding remain deferred.
   renderApp();
   loadGlobalEnhancements();
   installAppUpdateWatcher();
+  scheduleOnboarding();
 
   // Retire any old service worker after the current shell is already visible.
   window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},0);
