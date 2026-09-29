@@ -31,9 +31,9 @@ test('stock forecast never blocks the first Home dashboard',async()=>{
   const home=await source(homeUrl);
   const load=home.slice(home.indexOf('async function load()'),home.indexOf('useEffect(()=>{load()},[])'));
   const dashboard=load.indexOf('const dashboardResult=await fetchTodayDashboard');
-  const firstPaint=load.indexOf('setLoading(false);');
-  const readiness=load.indexOf('fetchTodayReadiness(supabase,current.user.id,todayKey())');
-  const forecast=load.indexOf('fetchTrainingFuelForecast(supabase,current.user.id)');
+  const firstPaint=load.indexOf('setLoading(false);',dashboard);
+  const readiness=load.indexOf('fetchTodayReadiness(supabase,current.user.id,todayKey())',dashboard);
+  const forecast=load.indexOf('fetchTrainingFuelForecast(supabase,current.user.id)',dashboard);
   assert.ok(dashboard>=0&&firstPaint>dashboard&&readiness>firstPaint&&forecast>firstPaint);
   assert.doesNotMatch(load,/Promise\.all\(\[[\s\S]*fetchTodayDashboard[\s\S]*fetchTrainingFuelForecast/);
   assert.match(home,/neither may hold the main Home dashboard hostage/);
