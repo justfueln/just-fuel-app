@@ -3,24 +3,37 @@ import { Activity, Flag, Fuel, Home, ShoppingBag, Store, UserRound } from 'lucid
 import { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
 import HomeIndex from './HomeIndex';
-import SmartAlerts from './SmartAlerts';
 import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, normalizeFuelView, trainingTabForRoute, trainingTargetForView, trainingViewFromState } from './navigation-registry';
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
 import {loadEnhancementsForSection} from './route-enhancements';
 
-const TrainingApp=lazy(()=>import('./App'));
-const RaceApp=lazy(()=>import('./RaceApp'));
-const CheckoutDrawer=lazy(()=>import('./CheckoutDrawer'));
-const FuelHubV2=lazy(()=>import('./FuelHubV2'));
-const ProfileHub=lazy(()=>import('./ProfileHub'));
-const ShopPage=lazy(()=>import('./CommercePages').then(mod=>({default:mod.ShopPage})));
+const loadTrainingRoute=()=>Promise.all([import('./training-route-styles'),import('./App')]).then(([,mod])=>({default:mod.default}));
+const loadRaceRoute=()=>Promise.all([import('./race-route-styles'),import('./RaceApp')]).then(([,mod])=>({default:mod.default}));
+const loadFuelRoute=()=>Promise.all([import('./fuel-route-styles'),import('./FuelHubV2')]).then(([,mod])=>({default:mod.default}));
+const loadProfileRoute=()=>Promise.all([import('./profile-route-styles'),import('./ProfileHub')]).then(([,mod])=>({default:mod.default}));
+const loadCheckoutRoute=()=>Promise.all([import('./checkout-route-styles'),import('./CheckoutDrawer')]).then(([,mod])=>({default:mod.default}));
+const loadShopRoute=()=>import('./CommercePages').then(mod=>({default:mod.ShopPage}));
+
+const TrainingApp=lazy(loadTrainingRoute);
+const RaceApp=lazy(loadRaceRoute);
+const CheckoutDrawer=lazy(loadCheckoutRoute);
+const FuelHubV2=lazy(loadFuelRoute);
+const ProfileHub=lazy(loadProfileRoute);
+const ShopPage=lazy(loadShopRoute);
+const SmartAlerts=lazy(()=>import('./SmartAlerts'));
 
 const NAV_ICONS={home:Home,training:Activity,race:Flag,fuel:Fuel,shop:Store};
+const ROUTE_PREFETCH={training:loadTrainingRoute,race:loadRaceRoute,fuel:loadFuelRoute,shop:loadShopRoute};
 const BASKET_KEY = 'just-fuel-basket-v3';
 const LAST_BASKET_KEY = 'just-fuel-last-basket-v1';
 const BASKET_TTL = basketTtlMs;
 const LAST_BASKET_TTL = lastBasketTtlMs;
 
+function prefetchRoute(id){
+  const connection=typeof navigator!=='undefined'?navigator.connection:null;
+  if(connection?.saveData||/2g/i.test(connection?.effectiveType||''))return;
+  ROUTE_PREFETCH[id]?.().catch(()=>{});
+}
 function loadBasket(){
   try{const raw=localStorage.getItem(BASKET_KEY);const items=readSavedItems(raw,BASKET_TTL);if(raw&&!items.length)localStorage.removeItem(BASKET_KEY);return items}catch{return[]}
 }
@@ -42,6 +55,7 @@ export default function ShellNextV3(){
   const {reminder,setReminder,reminderDue,requestReminderPermission,dismissReminder}=useWeeklyReminder();
   const [installPrompt,setInstallPrompt]=useState(null);
   const [installed,setInstalled]=useState(false);
+  const [alertsReady,setAlertsReady]=useState(false);
 
   const isTrainingArea=['training','race'].includes(section);
 
@@ -71,14 +85,12 @@ export default function ShellNextV3(){
     const target=trainingTargetForView(value);
     setTrainingView(target.id);
     window.history.pushState({...window.history.state,jfSection:historySection('training'),jfTrainingTab:target.legacyTab,jfTrainingView:target.id,jfTrainingSubView:target.subView,jfProfile:false,jfBasket:false},'',window.location.href);
-    // AppV3 owns the legacy Training tab state. Dispatch the new state so it can
-    // fetch/render the selected Training view without requiring a browser refresh.
     window.dispatchEvent(new PopStateEvent('popstate',{state:window.history.state}));
     resetScroll();
   }
-  function openProfile(){if(profileOpen)return;setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:historySection(section),jfProfile:true,jfBasket:false},'',window.location.href);resetScroll()}
+  function openProfile(){if(profileOpen)return;loadProfileRoute().catch(()=>{});setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:historySection(section),jfProfile:true,jfBasket:false},'',window.location.href);resetScroll()}
   function closeProfile(){if(window.history.state?.jfProfile)window.history.back();else setProfileOpen(false)}
-  function openBasket(){if(basketOpen)return;setProfileOpen(false);setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:historySection(section),jfTrainingView:trainingView,jfFuelView:fuelView,jfProfile:false,jfBasket:true},'',window.location.href)}
+  function openBasket(){if(basketOpen)return;loadCheckoutRoute().catch(()=>{});setProfileOpen(false);setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:historySection(section),jfTrainingView:trainingView,jfFuelView:fuelView,jfProfile:false,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
   function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
@@ -88,6 +100,11 @@ export default function ShellNextV3(){
     if(alert?.route==='race'){setSection('race');return}
     setSection('home');
   }
+
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>setAlertsReady(true),4000);
+    return()=>window.clearTimeout(timer);
+  },[]);
 
   useEffect(()=>{
     const url=new URL(window.location.href);
@@ -121,8 +138,9 @@ export default function ShellNextV3(){
 
   useEffect(()=>{
     const standalone=window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;setInstalled(Boolean(standalone));
-    const handler=e=>{e.preventDefault();setInstallPrompt(e)};window.addEventListener('beforeinstallprompt',handler);window.addEventListener('appinstalled',()=>setInstalled(true));
-    return()=>window.removeEventListener('beforeinstallprompt',handler);
+    const handler=e=>{e.preventDefault();setInstallPrompt(e)};const installedHandler=()=>setInstalled(true);
+    window.addEventListener('beforeinstallprompt',handler);window.addEventListener('appinstalled',installedHandler);
+    return()=>{window.removeEventListener('beforeinstallprompt',handler);window.removeEventListener('appinstalled',installedHandler)};
   },[]);
 
   const basketCount=useMemo(()=>basket.reduce((n,x)=>n+x.quantity,0),[basket]);
@@ -138,9 +156,9 @@ export default function ShellNextV3(){
 
   return <div className={`full-shell jf-next jf-v3 current-shell phase5-profile-shell ${profileOpen?'profile-open ':''}${isTrainingArea?'training-page phase2-training-shell':'current-page'}`}>
     {(!isTrainingArea||profileOpen)&&<CurrentAppHeader count={basketCount} onBasket={openBasket} onProfile={profileOpen?closeProfile:openProfile} profileOpen={profileOpen}/>} 
-    {isTrainingArea&&!profileOpen&&<><button className="training-profile-button" onClick={openProfile} aria-label="Profile and settings"><UserRound size={21}/></button><button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button></>}
+    {isTrainingArea&&!profileOpen&&<><button className="training-profile-button" onPointerDown={()=>loadProfileRoute().catch(()=>{})} onClick={openProfile} aria-label="Profile and settings"><UserRound size={21}/></button><button className="training-basket" onPointerDown={()=>loadCheckoutRoute().catch(()=>{})} onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button></>}
     {reminderDue&&!isTrainingArea&&!profileOpen&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('fuel',{fuelView:'planner'});dismissReminder()}} onDismiss={dismissReminder}/>} 
-    {!reminderDue&&!profileOpen&&!basketOpen&&!isTrainingArea&&<SmartAlerts onAction={openSmartAlert}/>} 
+    {alertsReady&&!reminderDue&&!profileOpen&&!basketOpen&&!isTrainingArea&&<Suspense fallback={null}><SmartAlerts onAction={openSmartAlert}/></Suspense>} 
 
     <div className="shell-content">
       <Suspense fallback={<RouteLoading/>}>
@@ -155,7 +173,7 @@ export default function ShellNextV3(){
       </Suspense>
     </div>
 
-    {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>}
+    {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onPointerEnter={()=>prefetchRoute(id)} onTouchStart={()=>prefetchRoute(id)} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>}
     {basketOpen&&<Suspense fallback={null}><CheckoutDrawer open close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/></Suspense>}
   </div>;
 }
@@ -165,4 +183,4 @@ function TrainingPhaseNav({value,onChange}){
     {TRAINING_NAV.map(item=><button key={item.id} className={value===item.id?'active':''} onClick={()=>onChange(item.id)}>{item.label}</button>)}
   </nav>
 }
-function CurrentAppHeader({count,onBasket,onProfile,profileOpen}){return <header className="current-app-header"><div><div className="current-brand">JUST FUEL</div><div className="current-subbrand">FUEL SMART • TRAIN HARD</div></div><div className="current-header-actions"><button className={`current-profile-button ${profileOpen?'active':''}`} onClick={onProfile} aria-label="Profile and settings"><UserRound size={22}/></button><button className="current-bag-button" onClick={onBasket} aria-label="Open basket"><ShoppingBag size={24}/>{count>0&&<span>{count}</span>}</button></div></header>}
+function CurrentAppHeader({count,onBasket,onProfile,profileOpen}){return <header className="current-app-header"><div><div className="current-brand">JUST FUEL</div><div className="current-subbrand">FUEL SMART • TRAIN HARD</div></div><div className="current-header-actions"><button className={`current-profile-button ${profileOpen?'active':''}`} onPointerDown={()=>loadProfileRoute().catch(()=>{})} onClick={onProfile} aria-label="Profile and settings"><UserRound size={22}/></button><button className="current-bag-button" onPointerDown={()=>loadCheckoutRoute().catch(()=>{})} onClick={onBasket} aria-label="Open basket"><ShoppingBag size={24}/>{count>0&&<span>{count}</span>}</button></div></header>}

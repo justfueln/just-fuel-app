@@ -76,8 +76,8 @@ test('Weekly plan alerts use a stable Monday-based week key',()=>{
 test('Phase 9 shell keeps alerts separate from Training/Race complex surfaces',()=>{
   const shell=readFileSync(join(here,'../src/ShellNextV3.jsx'),'utf8');
   const component=readFileSync(join(here,'../src/SmartAlerts.jsx'),'utf8');
-  assert.match(shell,/SmartAlerts/);
-  assert.match(shell,/!isTrainingArea&&<SmartAlerts/);
+  assert.match(shell,/const SmartAlerts=lazy\(\(\)=>import\('\.\/SmartAlerts'\)\)/);
+  assert.match(shell,/alertsReady&&!reminderDue&&!profileOpen&&!basketOpen&&!isTrainingArea/);
   assert.match(shell,/fuelView:alert\.fuelView/);
   assert.match(component,/jf-strava-synced/);
   assert.match(component,/requestIdleCallback/);

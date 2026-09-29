@@ -29,10 +29,14 @@ test('Home shows fuel, race and stock as daily priorities without duplicating ma
 
 test('stock forecast never blocks the first Home dashboard',async()=>{
   const home=await source(homeUrl);
-  const firstPaint=home.indexOf('setLoading(false);\n\n    // Stock');
-  const forecast=home.indexOf('fetchTrainingFuelForecast(supabase,current.user.id)');
-  assert.ok(firstPaint>=0&&forecast>=0&&firstPaint<forecast);
-  assert.match(home,/must never delay first paint/);
+  const load=home.slice(home.indexOf('async function load()'),home.indexOf('useEffect(()=>{load()},[])'));
+  const dashboard=load.indexOf('const dashboardResult=await fetchTodayDashboard');
+  const firstPaint=load.indexOf('setLoading(false);',dashboard);
+  const readiness=load.indexOf('fetchTodayReadiness(supabase,current.user.id,todayKey())',dashboard);
+  const forecast=load.indexOf('fetchTrainingFuelForecast(supabase,current.user.id)',dashboard);
+  assert.ok(dashboard>=0&&firstPaint>dashboard&&readiness>firstPaint&&forecast>firstPaint);
+  assert.doesNotMatch(load,/Promise\.all\(\[[\s\S]*fetchTodayDashboard[\s\S]*fetchTrainingFuelForecast/);
+  assert.match(home,/neither may hold the main Home dashboard hostage/);
 });
 
 test('weekly analytics are progressively disclosed',async()=>{

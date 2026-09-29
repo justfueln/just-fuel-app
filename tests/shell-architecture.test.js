@@ -6,9 +6,17 @@ const shellUrl=new URL('../src/ShellNextV3.jsx',import.meta.url);
 
 test('heavy app areas stay route-level lazy loaded',async()=>{
   const source=await readFile(shellUrl,'utf8');
-  const lazyModules=['./App','./RaceApp','./CheckoutDrawer','./FuelHubV2','./ProfileHub'];
-  for(const moduleName of lazyModules){
-    assert.match(source,new RegExp(`lazy\\(\\(\\)=>import\\(['\"]${moduleName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}['\"]\\)\\)`),`${moduleName} should remain lazy loaded`);
+  const routeLoaders=[
+    ['loadTrainingRoute','./App'],
+    ['loadRaceRoute','./RaceApp'],
+    ['loadCheckoutRoute','./CheckoutDrawer'],
+    ['loadFuelRoute','./FuelHubV2'],
+    ['loadProfileRoute','./ProfileHub']
+  ];
+  for(const [loader,moduleName] of routeLoaders){
+    const escaped=moduleName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    assert.match(source,new RegExp(`const ${loader}=.*import\\(['\"]${escaped}['\"]\\)`),`${moduleName} should remain dynamically imported`);
+    assert.match(source,new RegExp(`lazy\\(${loader}\\)`),`${moduleName} loader should remain lazy mounted`);
   }
   assert.doesNotMatch(source,/import\s+TrainingApp\s+from\s+['"]\.\/App['"]/);
   assert.doesNotMatch(source,/import\s+RaceApp\s+from\s+['"]\.\/RaceApp['"]/);

@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0b0b" />
+    <meta name="theme-color" content="#080808" />
+    <meta name="color-scheme" content="dark" />
     <meta name="description" content="Just Fuel training, race, fueling and ordering app" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -15,40 +16,23 @@
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
     <title>Just Fuel</title>
     <style>
-      html,body,#root{min-height:100%;}
-      body{margin:0;background:#f6f6f3;color:#111;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-      .jf-boot{min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column;background:#f6f6f3;}
-      .jf-boot-head{background:#0b0b0b;color:#fff;padding:max(18px,env(safe-area-inset-top)) 20px 17px;box-sizing:border-box;}
-      .jf-boot-brand{font-size:22px;font-weight:900;letter-spacing:.11em;line-height:1;}
-      .jf-boot-sub{margin-top:6px;font-size:10px;font-weight:700;letter-spacing:.13em;opacity:.7;}
+      html,body,#root{min-height:100%;background:#080808;}
+      body{margin:0;background:#080808;color:#f4f0e5;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+      .jf-boot{min-height:100vh;box-sizing:border-box;display:flex;flex-direction:column;background:#080808;color:#f4f0e5;}
+      .jf-boot-head{background:#080808;color:#fff;padding:max(18px,env(safe-area-inset-top)) 20px 17px;box-sizing:border-box;border-bottom:1px solid rgba(224,184,79,.2);}
+      .jf-boot-brand{font-size:22px;font-weight:900;letter-spacing:.11em;line-height:1;color:#e0b84f;}
+      .jf-boot-sub{margin-top:6px;font-size:10px;font-weight:700;letter-spacing:.13em;color:#8f8f8a;}
       .jf-boot-main{flex:1;padding:24px 18px 96px;box-sizing:border-box;max-width:720px;width:100%;margin:0 auto;}
-      .jf-boot-kicker{font-size:12px;font-weight:800;letter-spacing:.12em;color:#70706c;}
+      .jf-boot-kicker{font-size:12px;font-weight:800;letter-spacing:.12em;color:#e0b84f;}
       .jf-boot-title{margin:8px 0 18px;font-size:30px;line-height:1.08;font-weight:850;}
-      .jf-boot-card{height:170px;border-radius:22px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.06);position:relative;overflow:hidden;}
-      .jf-boot-card:before,.jf-boot-card:after,.jf-boot-line{content:"";position:absolute;left:18px;right:18px;height:14px;border-radius:8px;background:#ecece8;}
+      .jf-boot-card{height:170px;border-radius:22px;background:#11110f;border:1px solid #2d2b24;position:relative;overflow:hidden;}
+      .jf-boot-card:before,.jf-boot-card:after,.jf-boot-line{content:"";position:absolute;left:18px;right:18px;height:14px;border-radius:8px;background:#1d1d19;}
       .jf-boot-card:before{top:24px;right:42%;}.jf-boot-card:after{top:54px;right:18%;}.jf-boot-line{top:88px;right:28%;}
-      .jf-boot-nav{position:fixed;z-index:2;left:0;right:0;bottom:0;height:74px;padding-bottom:env(safe-area-inset-bottom);box-sizing:content-box;background:#fff;border-top:1px solid #e7e7e2;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;text-align:center;font-size:10px;font-weight:750;color:#6e6e69;}
-      .jf-boot-nav span:first-child{color:#111;}
+      .jf-boot-nav{position:fixed;z-index:2;left:0;right:0;bottom:0;height:74px;padding-bottom:env(safe-area-inset-bottom);box-sizing:content-box;background:#0a0a09;border-top:1px solid #2b2922;display:grid;grid-template-columns:repeat(5,1fr);align-items:center;text-align:center;font-size:10px;font-weight:750;color:#777772;}
+      .jf-boot-nav span:first-child{color:#e0b84f;}
       @media (prefers-reduced-motion:no-preference){.jf-boot-card:after,.jf-boot-line{animation:jfboot 1.15s ease-in-out infinite alternate}@keyframes jfboot{to{opacity:.45}}}
     </style>
-    <script>
-      window.__JF_CURRENT_APP_VERSION__='16';
-      if ('serviceWorker' in navigator) {
-        (async () => {
-          try {
-            const url = new URL(window.location.href);
-            const cleared = url.searchParams.get('legacy') === 'cleared' && url.searchParams.get('jfapp') === '16';
-            const registrations = await navigator.serviceWorker.getRegistrations();
-            if (!cleared && (registrations.length || navigator.serviceWorker.controller)) {
-              const retirement = await navigator.serviceWorker.register('/sw.js?retire=16', { scope: '/', updateViaCache: 'none' });
-              try { await retirement.update(); } catch {}
-              try { retirement.waiting?.postMessage('JF_FORCE_ACTIVATE'); } catch {}
-              try { retirement.installing?.postMessage('JF_FORCE_ACTIVATE'); } catch {}
-            }
-          } catch {}
-        })();
-      }
-    </script>
+    <script>window.__JF_CURRENT_APP_VERSION__='16';</script>
   </head>
   <body>
     <div id="root">

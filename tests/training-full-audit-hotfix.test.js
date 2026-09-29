@@ -24,7 +24,8 @@ test('Training enhancements are scoped to the view the athlete actually opened',
 
 test('hidden smart alerts do not run background dashboard and fuel requests in Training',()=>{
   const shell=read('src/ShellNextV3.jsx');
-  assert.match(shell,/!isTrainingArea&&<SmartAlerts/);
+  assert.match(shell,/const SmartAlerts=lazy\(\(\)=>import\('\.\/SmartAlerts'\)\)/);
+  assert.match(shell,/alertsReady&&!reminderDue&&!profileOpen&&!basketOpen&&!isTrainingArea/);
 });
 
 test('completed-training helpers stay off the heavyweight fuel calendar',()=>{
