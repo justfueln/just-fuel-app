@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {Activity,ArrowLeft,Check,Flag,Link2,X} from 'lucide-react';
 import {supabase} from './main';
 import {startTrainingStrava} from './training-api';
@@ -132,9 +132,9 @@ export default function AthleteOnboardingGate(){
     }));
     const sportsResult=await supabase.from('training_sport_profiles').upsert(rows,{onConflict:'user_id,sport_family'});
     if(sportsResult.error){setStatus(sportsResult.error.message);setSaving(false);return false}
-    await Promise.all([
-      supabase.rpc('refresh_training_sport_detection',{p_user_id:uid}).catch(()=>null),
-      supabase.rpc('refresh_training_session_targets',{p_user_id:uid}).catch(()=>null)
+    await Promise.allSettled([
+      Promise.resolve(supabase.rpc('refresh_training_sport_detection',{p_user_id:uid})),
+      Promise.resolve(supabase.rpc('refresh_training_session_targets',{p_user_id:uid}))
     ]);
     localStorage.setItem(progressKey(uid),'1');
     await loadForUser(uid,{autoOpen:false});
@@ -220,7 +220,7 @@ export default function AthleteOnboardingGate(){
 
       {step==='race'&&<section>
         <span className="eyebrow">OPTIONAL</span><h2>{setup?.active_race_exists?'Your race is already set':'Do you have a target race?'}</h2><p>Race setup is optional. Add an event now if you have one, or finish and add it later from Race.</p>
-        <div className="jf-onboarding-race"><Flag size={25}/><div><strong>{setup?.active_race_exists?setup?.event_name:'No race required to finish setup'}</strong><small>{setup?.active_race_exists?'Your plan can use this event as race context.':'Training and fueling remain usable without adding a race today.'}</small></div></div>
+        <div className="jf-onboarding-race"><Flag size={25}/><div><strong>{setup?.active_race_exists?setup?.event_name:'No race required to finish setup'}</strong><small>{setup?.active_race_exists?'Your plan can use this event as race context.':'You can finish setup now and add a target race later from Race.'}</small></div></div>
       </section>}
 
       {status&&<div className="notice">{status}</div>}
