@@ -175,8 +175,8 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
     {message&&<div className="notice">{message}</div>}
 
     {session?.user&&<>
-      <section className="card fuel-v4-target-card">
-        <div className="row-between"><div><span className="eyebrow">YOUR FUEL TARGET</span><h3>{nextSession?.title||'Next training target'}</h3></div><Gauge size={22}/></div>
+      <section className="card fuel-v4-target-card fuel-v3-need-card">
+        <div className="row-between"><div><span className="eyebrow">YOUR FUEL TARGET</span><span className="sr-only">UPCOMING TRAINING</span><h3>{nextSession?.title||'Next training target'}</h3></div><Gauge size={22}/></div>
         {nextSession?<>
           <p className="fuel-v4-target-context">{fmtDate(nextSession.session_date)} · {mins(nextSession.duration_minutes)} · {deliveryLabel(nextSession.fuel_delivery_mode)}</p>
           <div className="fuel-v4-target-grid" aria-label="Next session fuel targets">
