@@ -57,7 +57,8 @@ export function loadEnhancementsForSection(section){
       .then(()=>Promise.all([
         import('./race-goal-progress-v1'),
         import('./race-fuel-rehearsal-v1'),
-        import('./race-week-execution-v1')
+        import('./race-week-execution-v1'),
+        import('./race-fuzzy-search-v1')
       ]))
       .catch(error=>console.warn('Race enhancement load failed:',error));
   }
