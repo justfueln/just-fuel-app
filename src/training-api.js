@@ -85,13 +85,39 @@ export async function applyMorningReadinessAdjustment(client,today,accept){
 }
 
 export async function fetchTrainingPlan(client,userId){
-  const[calendar,active]=await Promise.all([
-    client.from('training_plan_calendar_with_fuel').select('*').eq('user_id',userId).order('session_date',{ascending:true}),
-    client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle()
-  ]);
-  const error=calendar.error||active.error||null;
+  const active=await client.from('training_plans')
+    .select('id')
+    .eq('user_id',userId)
+    .eq('status','active')
+    .order('generated_at',{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(active.error)return{plan:[],error:active.error};
+
   const activePlanId=active.data?.id;
-  return{plan:error?[]:activePlanId?(calendar.data||[]).filter(x=>x.plan_id===activePlanId):[],error};
+  if(!activePlanId)return{plan:[],error:null};
+
+  const fullQuery=client.from('training_plan_calendar_with_fuel')
+    .select('*')
+    .eq('user_id',userId)
+    .eq('plan_id',activePlanId)
+    .order('session_date',{ascending:true});
+  let calendar;
+  try{calendar=await runPostgrest(fullQuery,2200)}catch(error){calendar={data:null,error}}
+  if(!calendar?.error)return{plan:calendar?.data||[],error:null};
+
+  // The full calendar includes several enrichment views. If that request is slow or
+  // aborted on mobile, show the actual training sessions immediately rather than an
+  // empty week. Fuel/detail enrichments can load elsewhere without blocking Plan.
+  const coreQuery=client.from('training_plan_calendar')
+    .select('*')
+    .eq('user_id',userId)
+    .eq('plan_id',activePlanId)
+    .order('session_date',{ascending:true});
+  let core;
+  try{core=await runPostgrest(coreQuery,3000)}catch(error){core={data:null,error}}
+  if(core?.error)return{plan:[],error:core.error};
+  return{plan:core?.data||[],error:null,warning:calendar.error};
 }
 
 export async function fetchFuelTrainingPlan(client,userId){
