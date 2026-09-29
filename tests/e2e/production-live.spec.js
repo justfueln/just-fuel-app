@@ -5,7 +5,6 @@ const base=process.env.JF_PRODUCTION_URL||'https://app.justfuelnutrition.co.za';
 
 test.describe('live production smoke',()=>{
   test.skip(!live,'Runs only from the post-deploy production smoke job.');
-
   test.use({viewport:{width:412,height:915}});
 
   test('root loads without fatal UI or horizontal overflow',async({page})=>{
@@ -35,11 +34,10 @@ test.describe('live production smoke',()=>{
     }
   });
 
-  test('profile opens and closes on a phone-sized viewport',async({page})=>{
+  test('profile opens on a phone-sized viewport',async({page})=>{
     await page.goto(`${base}/?jfapp=16&legacy=cleared&qa=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:45000});
     await page.getByRole('button',{name:'Profile and settings'}).first().click();
     await expect(page.getByText('Profile & Settings',{exact:true})).toBeVisible({timeout:15000});
     await expect(page.locator('.jf-error-screen')).toHaveCount(0);
-    await page.getByRole('button',{name:/close profile|back to profile/i}).first().click().catch(()=>{});
   });
 });
