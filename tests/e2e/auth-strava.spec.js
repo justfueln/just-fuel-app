@@ -51,8 +51,8 @@ test('signed-in athlete keeps session and can run repeated Strava sync flow', as
       return json(route,{ok:true});
     }
     if(name==='training_setup_status')return json(route,[{user_id:USER_ID,next_step:'ready',strava_connected:true}]);
-    if(name==='training_profiles')return json(route,[{user_id:USER_ID,primary_sport:'cycling',available_weekdays:[2,4,6],long_session_weekday:6}]);
-    if(name==='training_sport_profiles')return json(route,[]);
+    if(name==='training_profiles')return json(route,[{user_id:USER_ID,primary_sport:'cycling',sports_enabled:['cycling'],date_of_birth:'1985-05-10',experience_level:'intermediate',available_weekdays:[2,4,6],long_session_weekday:6,weekday_session_minutes:90,long_session_max_minutes:300}]);
+    if(name==='training_sport_profiles')return json(route,[{user_id:USER_ID,sport_family:'cycling',enabled:true,is_primary:true,preferred_intensity_source:'auto'}]);
     return json(route,[]);
   });
 
@@ -69,7 +69,6 @@ test('signed-in athlete keeps session and can run repeated Strava sync flow', as
   await page.getByRole('button',{name:'Sync now'}).click();
   await expect(page.getByText(/Strava synced · 2 upcoming sessions checked or adjusted\./i)).toBeVisible();
 
-  // A fresh app navigation must reuse the persisted Supabase session instead of asking for OTP again.
   await page.goto('/?jfapp=16&legacy=cleared&e2e=session-reload');
   await expect(page.getByText('JUST FUEL').first()).toBeVisible();
   await page.getByRole('button',{name:'Profile and settings'}).click();
