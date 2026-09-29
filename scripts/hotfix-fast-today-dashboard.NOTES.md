@@ -1,1 +1,0 @@
-This script mirrors the production migration applied on 2026-09-29 after the signed-in Home dashboard began timing out. It intentionally avoids `training_session_fuel_plan_multisport` inside `get_today_dashboard`; detailed Training/Fuel routes still use the full fuel engine.
