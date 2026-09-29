@@ -56,7 +56,9 @@ test('signed-in athlete keeps session and can run repeated Strava sync flow', as
     return json(route,[]);
   });
 
-  await page.route(`${SUPABASE}/functions/v1/strava-sync`,route=>json(route,{ok:true}));
+  // Production Strava sync already owns matching/adaptation/progression/target refreshes.
+  // The browser should consume that result instead of replaying the same RPC chain.
+  await page.route(`${SUPABASE}/functions/v1/strava-sync`,route=>json(route,{ok:true,plan_adaptation:{changed_sessions:2}}));
 
   await page.goto('/?jfapp=16&legacy=cleared&e2e=auth-strava');
   await expect(page.getByText('JUST FUEL').first()).toBeVisible();
