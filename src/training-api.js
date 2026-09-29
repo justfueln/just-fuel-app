@@ -157,10 +157,24 @@ export async function fetchTrainingPlan(client,userId){
   const fields='id,plan_id,week_id,user_id,race_goal_id,session_date,sport_type,session_type,title,phase,intensity_zone,planned_duration_minutes,duration_minutes,target_load,target_power_low_w,target_power_high_w,target_distance_km,target_elevation_m,is_key_session,priority,instructions,status,week_number,week_start,week_focus,is_recovery,adaptation_factor,adaptation_reason,event_name,event_date,actual_activity_id,actual_strava_activity_id,actual_start_date_local,actual_name,actual_duration_minutes,actual_distance_km,actual_elevation_m,actual_avg_hr,actual_weighted_watts,actual_training_load,match_score,duration_completion_pct,load_completion_pct,progression_status,progression_factor,progression_reason,progression_source_count,progression_applied_at,target_metric,target_hr_low,target_hr_high,target_pace_fast_sec_per_km,target_pace_slow_sec_per_km,target_rpe_low,target_rpe_high,target_metric_note';
   const calendar=await safePostgrest(
     client.from('training_plan_calendar').select(fields).eq('user_id',userId).eq('plan_id',activePlanId).order('session_date',{ascending:true}),
-    1800
+    3200
   );
-  if(calendar.error)return{plan:[],error:calendar.error};
-  return{plan:calendar.data||[],error:null};
+  if(!calendar.error)return{plan:calendar.data||[],error:null};
+
+  // Keep Plan usable on mobile even when the enriched calendar is slow. The base
+  // session table contains the workout itself; completion/fuel enrichment can load
+  // elsewhere without turning the whole week into an empty state.
+  const fallbackFields='id,plan_id,week_id,user_id,race_goal_id,session_date,sport_type,session_type,title,phase,intensity_zone,planned_duration_minutes,adjusted_duration_minutes,target_load,target_power_low_w,target_power_high_w,target_distance_km,target_elevation_m,is_key_session,priority,instructions,status,progression_status,progression_factor,progression_reason,progression_source_count,progression_applied_at,target_metric,target_hr_low,target_hr_high,target_pace_fast_sec_per_km,target_pace_slow_sec_per_km,target_rpe_low,target_rpe_high,target_metric_note';
+  const fallback=await safePostgrest(
+    client.from('training_plan_sessions').select(fallbackFields).eq('user_id',userId).eq('plan_id',activePlanId).order('session_date',{ascending:true}),
+    2600
+  );
+  if(fallback.error)return{plan:[],error:fallback.error};
+  return{
+    plan:(fallback.data||[]).map(row=>({...row,duration_minutes:row.adjusted_duration_minutes??row.planned_duration_minutes})),
+    error:null,
+    warning:calendar.error
+  };
 }
 
 export async function fetchFuelTrainingPlan(client,userId){
