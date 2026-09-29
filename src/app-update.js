@@ -67,8 +67,12 @@ export async function checkForAppUpdate({minGapMs=15000,force=false}={}){
 
 export function installAppUpdateWatcher(){
   if(typeof window==='undefined'||typeof document==='undefined')return()=>{};
-  const check=()=>checkForAppUpdate().catch(()=>{});
-  const first=window.setTimeout(check,8000);
+  let armed=false;
+  const check=()=>armed?checkForAppUpdate().catch(()=>{}):Promise.resolve(false);
+  const first=window.setTimeout(()=>{
+    armed=true;
+    checkForAppUpdate({force:true}).catch(()=>{});
+  },8000);
   const interval=window.setInterval(check,180000);
   const onVisibility=()=>{if(document.visibilityState==='visible')check()};
   window.addEventListener('focus',check,{passive:true});
