@@ -88,9 +88,12 @@ function labelOf(target){
 function classifyClick(target){
   const{el,label}=labelOf(target);if(!el||el.closest('[data-analytics-ignore="true"]'))return null;
   if(el.closest('.bottom-nav'))return['nav_section',{destination:(el.textContent||'').trim()}];
+  if(el.matches('.phase9-alert-action'))return['smart_alert_action',{alert_type:el.closest('.phase9-smart-alert')?.classList?.[1]||'unknown'}];
+  if(el.matches('.phase9-alert-dismiss'))return['smart_alert_dismissed',{alert_type:el.closest('.phase9-smart-alert')?.classList?.[1]||'unknown'}];
   if(el.matches('.bag-button,.training-basket')||/open basket/.test(label))return['basket_opened',basketSummary()];
   if(/repeat previous basket/.test(label))return['previous_basket_clicked',basketSummary()];
   if(/add selected/.test(label))return['shop_add_selected',basketSummary()];
+  if(/add shortage to basket/.test(label))return['fuel_shortage_add_clicked',basketSummary()];
   if(/add .*training fuel.*basket|add training fuel.*basket/.test(label))return['training_fuel_add_clicked',basketSummary()];
   if(/add .*race fuel.*basket|add race fuel.*basket/.test(label))return['race_fuel_add_clicked',basketSummary()];
   if(/add .*fuel.*basket|add plan.*basket/.test(label))return['fuel_plan_add_clicked',basketSummary()];

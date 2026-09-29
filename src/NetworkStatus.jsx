@@ -26,7 +26,7 @@ export default function NetworkStatus(){
     };
   },[]);
 
-  if(!online)return <div className="jf-network-banner offline" role="status">Offline · you can keep browsing cached screens</div>;
-  if(showBackOnline)return <div className="jf-network-banner online" role="status">Back online</div>;
+  if(!online)return <div className="jf-network-banner offline" role="status" aria-live="polite">Offline · live sync, ordering and updates may be unavailable</div>;
+  if(showBackOnline)return <div className="jf-network-banner online" role="status" aria-live="polite">Back online</div>;
   return null;
 }
