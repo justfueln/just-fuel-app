@@ -8,12 +8,14 @@ import {byKey} from './catalog';
 import {fetchFuelTrainingPlan,fetchTrainingFuelBase,fetchTrainingFuelForecast} from './training-api';
 import {hydratePacks,restockShortfalls} from './fuel-utils';
 import {FUEL_NAV,normalizeFuelView} from './navigation-registry';
+import './fuel-target-visibility.css';
 
 const fmtDate=v=>v?new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short'}).format(new Date(`${String(v).slice(0,10)}T12:00:00`)):'—';
 const mins=v=>{const n=Math.max(0,Math.round(Number(v)||0)),h=Math.floor(n/60),m=n%60;return h?`${h}h${m?` ${m}m`:''}`:`${m}m`};
 const todayKey=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const addDays=days=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()+days);const p=n=>String(n).padStart(2,'0');return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`};
 const n=v=>Math.max(0,Number(v)||0);
+const metricValue=v=>n(v)>0?Math.round(n(v)):'—';
 const daysTo=date=>{if(!date)return null;const now=new Date();now.setHours(0,0,0,0);const target=new Date(`${String(date).slice(0,10)}T12:00:00`);return Math.max(0,Math.ceil((target-now)/86400000))};
 const deliveryLabel=value=>({bottle_first:'Bottle-first',gels_first:'Gels-first',brick_split:'Bike bottles + run gels',session_support:'Hydration + recovery',poolside:'Poolside',mixed:'Mixed'}[String(value||'')]||'Balanced');
 const friendlyFuelError=error=>{
@@ -131,6 +133,23 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
   const weekForecast=useMemo(()=>forecast.filter(x=>Number(x.horizon_days)===7),[forecast]);
   const weekShortfalls=useMemo(()=>forecastReady?restockShortfalls(weekForecast):({}),[weekForecast,forecastReady]);
   const shortfallUnits=useMemo(()=>forecastReady?orderUnits(weekShortfalls):0,[weekShortfalls,forecastReady]);
+  const nextFuelTarget=useMemo(()=>nextSession?{
+    carbs:metricValue(nextSession.carb_target_gph),
+    fluid:metricValue(nextSession.hydration_ml_per_hour),
+    sodium:metricValue(nextSession.sodium_target_mg_per_hour)
+  }:null,[nextSession]);
+  const weekOrderSummary=useMemo(()=>({
+    mix:Math.ceil(n(weekShortfalls.bottle_mix)),
+    gels:Math.ceil(n(weekShortfalls.energy_gel))+Math.ceil(n(weekShortfalls.boost_gel)),
+    hydrate:hydratePacks(weekShortfalls.hydrate),
+    recover:Math.ceil(n(weekShortfalls.recover))
+  }),[weekShortfalls]);
+  const shortageText=useMemo(()=>[
+    weekOrderSummary.mix?`${weekOrderSummary.mix} Bottle Mix`:null,
+    weekOrderSummary.gels?`${weekOrderSummary.gels} gel${weekOrderSummary.gels===1?'':'s'}`:null,
+    weekOrderSummary.hydrate?`${weekOrderSummary.hydrate} Hydrate 10-pack${weekOrderSummary.hydrate===1?'':'s'}`:null,
+    weekOrderSummary.recover?`${weekOrderSummary.recover} Recover`:null
+  ].filter(Boolean).join(' · '),[weekOrderSummary]);
   const stockStatus=useMemo(()=>PRODUCT_ROWS.map(([key,label,unit])=>{
     const forecastRow=weekForecast.find(row=>row.product_key===key);
     const stockRow=stock.find(row=>row.product_key===key);
@@ -156,10 +175,30 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
     {message&&<div className="notice">{message}</div>}
 
     {session?.user&&<>
-      <section className="card fuel-v3-need-card">
-        <div className="row-between"><div><span className="eyebrow">UPCOMING TRAINING</span><h3>Next 7 days</h3></div><Fuel size={21}/></div>
-        <p className="fuel-v3-context">{week.length?`${week.length} planned session${week.length===1?'':'s'}${nextSession?` · next: ${fmtDate(nextSession.session_date)} — ${nextSession.title}`:''}`:'No planned training sessions in the next 7 days.'}</p>
-        <div className="fuel-v2-summary-grid"><span><b>{weekTotals.mix}</b>Bottle Mix</span><span><b>{weekTotals.regular+weekTotals.boost}</b>Gels</span><span><b>{weekTotals.hydrate}</b>Hydrate</span><span><b>{weekTotals.recover}</b>Recover</span></div>
+      <section className="card fuel-v4-target-card">
+        <div className="row-between"><div><span className="eyebrow">YOUR FUEL TARGET</span><h3>{nextSession?.title||'Next training target'}</h3></div><Gauge size={22}/></div>
+        {nextSession?<>
+          <p className="fuel-v4-target-context">{fmtDate(nextSession.session_date)} · {mins(nextSession.duration_minutes)} · {deliveryLabel(nextSession.fuel_delivery_mode)}</p>
+          <div className="fuel-v4-target-grid" aria-label="Next session fuel targets">
+            <span><b>{nextFuelTarget?.carbs}</b><small>g carbs / hour</small></span>
+            <span><b>{nextFuelTarget?.fluid}</b><small>ml fluid / hour</small></span>
+            <span><b>{nextFuelTarget?.sodium}</b><small>mg sodium / hour</small></span>
+          </div>
+        </>:<p className="fuel-v4-target-context">Your carb, hydration and sodium targets will appear here when your next training session is ready.</p>}
+        <div className="fuel-v4-week-strip">
+          <div><span>Next 7 days</span><strong>{week.length?`${week.length} planned session${week.length===1?'':'s'}`:'No sessions planned'}</strong></div>
+          {week.length>0&&<div className="fuel-v4-week-products" aria-label="Seven day fuel requirement">
+            <span><b>{weekTotals.mix}</b>Bottle Mix</span>
+            <span><b>{weekTotals.regular+weekTotals.boost}</b>Gels</span>
+            <span><b>{weekTotals.hydrate}</b>Hydrate servings</span>
+            <span><b>{weekTotals.recover}</b>Recover</span>
+          </div>}
+          {forecastReady&&shortfallUnits>0&&<>
+            <div className="fuel-v4-shortage-line"><span>You need to order</span><strong>{shortageText||`${Math.ceil(shortfallUnits)} fuel items`}</strong></div>
+            <button className="primary fuel-v4-order-button" onClick={()=>go('order')}><ShoppingBag size={17}/>Order my shortage</button>
+          </>}
+          {forecastReady&&!shortfallUnits&&<div className="fuel-v4-target-covered">Your saved stock covers the next 7 days.</div>}
+        </div>
       </section>
 
       <section className="card fuel-v3-race-card">
