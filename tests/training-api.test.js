@@ -33,6 +33,28 @@ test('training plan prefers the plan that is in progress over a newer future pla
   assert.ok(filters.some(([table,column,value])=>table==='training_plan_calendar'&&column==='user_id'&&value==='user-1'));
 });
 
+test('training plan falls back to base sessions when enriched calendar aborts on mobile',async()=>{
+  const tables=[];
+  const client={from(table){
+    tables.push(table);
+    if(table==='training_plans')return query({data:[
+      {id:'active',start_date:'2000-01-01',race_date:'2098-12-31',generated_at:'2020-01-01T12:00:00Z'}
+    ],error:null});
+    if(table==='training_plan_calendar')return query({data:null,error:{message:'AbortError: signal is aborted without reason'}});
+    if(table==='training_plan_sessions')return query({data:[{
+      id:'session-1',plan_id:'active',session_date:'2090-09-29',title:'Endurance',planned_duration_minutes:60,adjusted_duration_minutes:75
+    }],error:null});
+    throw new Error(`Unexpected table ${table}`);
+  }};
+  const result=await fetchTrainingPlan(client,'user-1');
+  assert.equal(result.error,null);
+  assert.equal(result.plan.length,1);
+  assert.equal(result.plan[0].title,'Endurance');
+  assert.equal(result.plan[0].duration_minutes,75);
+  assert.match(result.warning.message,/AbortError/);
+  assert.deepEqual(tables,['training_plans','training_plan_calendar','training_plan_sessions']);
+});
+
 test('training history reads the deduplicated multisport metrics view and maps effective metrics plus JF load',async()=>{
   const tables=[];
   const client={from(table){
