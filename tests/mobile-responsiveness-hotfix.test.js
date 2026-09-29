@@ -26,9 +26,13 @@ test('global UX layer is event driven rather than observing every DOM mutation',
   assert.match(ux,/requestAnimationFrame/);
 });
 
-test('Training enhancement bundles are deferred away from first interaction',()=>{
+test('Training enhancement bundles are deferred away from first interaction and scoped by view',()=>{
   const routes=read('src/route-enhancements.js');
-  assert.match(routes,/5200/);
-  assert.match(routes,/training-workout-details/);
   assert.match(routes,/requestIdleCallback/);
+  assert.match(routes,/function loadTrainingToday/);
+  assert.match(routes,/function loadTrainingPlan/);
+  assert.match(routes,/function loadTrainingProgress/);
+  assert.match(routes,/training-workout-details/);
+  const today=routes.slice(routes.indexOf('function loadTrainingToday'),routes.indexOf('function loadTrainingPlan'));
+  assert.doesNotMatch(today,/training-power-curve-v1|training-achievements-v1|training-progression-v1|training-readiness-v1/);
 });
