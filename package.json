@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "node --test",
     "test:e2e": "playwright test",
-    "check": "npm test && npm run build"
+    "perf:budget": "node scripts/check-performance-budget.mjs",
+    "check": "npm test && npm run build && npm run perf:budget"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
