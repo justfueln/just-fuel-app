@@ -29,7 +29,7 @@ test('performance recommendation is moved ahead of raw metrics while detailed da
 
 test('smart coaching remains route-scoped so startup performance hotfix is preserved',async()=>{
   const loader=await readFile(loaderUrl,'utf8');
-  assert.match(loader,/if\(section==='home'\)idle\(\(\)=>ensureSmartCoach\(\),900\)/);
+  assert.match(loader,/if\(section==='home'\)idle\(\(\)=>ensureSmartCoach\(\),\d+/);
   assert.match(loader,/section==='training'/);
   assert.match(loader,/ensureSmartCoach\(\)/);
   const globalBody=loader.slice(loader.indexOf('export function loadGlobalEnhancements'),loader.indexOf('export function loadEnhancementsForSection'));

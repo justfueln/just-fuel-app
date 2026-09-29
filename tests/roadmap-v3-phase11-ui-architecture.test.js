@@ -26,7 +26,7 @@ test('Phase 11 stops loading the legacy post-render Training navigation patcher'
 test('Phase 11 makes Today Plan Progress the single normal Training navigation layer',()=>{
   const css=read('src/training-native-v11.css');
   assert.match(css,/app-shell>\.section-nav\{display:none!important\}/);
-  assert.match(css,/:has\(button:nth-child\(n\+4\)\.active\)/);
+  assert.doesNotMatch(css,/:has\(/);
   assert.match(css,/jf-profile-button\{display:none!important\}/);
 });
 

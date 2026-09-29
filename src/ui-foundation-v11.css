@@ -1,4 +1,4 @@
-:root{--jf-gold:#dcb34b;--jf-gold-soft:rgba(220,179,75,.12);--jf-bg:#080808;--jf-surface:#11110f;--jf-surface-raised:#151512;--jf-border:rgba(255,255,255,.09);--jf-border-gold:rgba(220,179,75,.28);--jf-text:#f3f1e8;--jf-muted:#9f9f98;--jf-radius-sm:12px;--jf-radius-md:16px;--jf-radius-card:20px;--jf-space-1:6px;--jf-space-2:10px;--jf-space-3:14px;--jf-space-4:18px;--jf-space-5:24px;--jf-shadow-card:0 12px 30px rgba(0,0,0,.18)}
+:root{--jf-gold:#dcb34b;--jf-gold-soft:rgba(220,179,75,.12);--jf-bg:#080808;--jf-surface:#11110f;--jf-surface-raised:#151512;--jf-border:rgba(255,255,255,.09);--jf-border-gold:rgba(220,179,75,.28);--jf-text:#f3f1e8;--jf-muted:#9f9f98;--jf-radius-sm:12px;--jf-radius-md:16px;--jf-radius-card:20px;--jf-space-1:6px;--jf-space-2:10px;--jf-space-3:14px;--jf-space-4:18px;--jf-space-5:24px;--jf-shadow-card:0 8px 22px rgba(0,0,0,.14)}
 
 :is(.card,.hero-card,.settings-card,.shop-order-card,.race-v2-card,.fuel-v4-target-card,.profile-account-card){border-radius:var(--jf-radius-card);border-color:var(--jf-border);box-shadow:var(--jf-shadow-card)}
 :is(.primary,.secondary,.shop-plan,.shop-add-selected,.checkout-primary,.checkout-choice,.fuel-v2-wide,.race-v2-add,.profile-signout,.install-button){border-radius:var(--jf-radius-sm);font-weight:800}
@@ -9,17 +9,17 @@
 .eyebrow,.page-kicker,.today-kicker{letter-spacing:.09em}
 .muted{color:var(--jf-muted)}
 
-/* Keep hierarchy consistent across the five main app areas without flattening their identity. */
 .today-dashboard>section,.fuel-v2-page>section,.race-v2-shell>section,.profile-page>section{scroll-margin-top:88px}
-.bottom-nav.phase1-nav button,.training-phase2-nav button{transition:color .15s ease,border-color .15s ease,background .15s ease}
+.bottom-nav.phase1-nav button,.training-phase2-nav button{transition:color .12s ease,border-color .12s ease,background .12s ease}
 .bottom-nav.phase1-nav button.active,.training-phase2-nav button.active{color:var(--jf-gold)}
 
-/* Forms should read as one system even where legacy screens still provide the data layer. */
 label>input,label>select,label>textarea{margin-top:var(--jf-space-1)}
 :is(input,select,textarea):focus{border-color:var(--jf-gold);box-shadow:0 0 0 2px rgba(220,179,75,.12)}
 
 @media(max-width:620px){
-  :root{--jf-radius-card:18px;--jf-space-4:14px;--jf-space-5:20px}
+  :root{--jf-radius-card:18px;--jf-space-4:14px;--jf-space-5:20px;--jf-shadow-card:none}
   .stack{gap:var(--jf-space-3)}
+  :is(.card,.hero-card,.settings-card,.shop-order-card,.race-v2-card,.fuel-v4-target-card,.profile-account-card){box-shadow:none}
   :is(.card,.hero-card,.settings-card,.shop-order-card,.race-v2-card,.fuel-v4-target-card){padding-left:16px;padding-right:16px}
+  .bottom-nav.phase1-nav button,.training-phase2-nav button{transition:none}
 }
