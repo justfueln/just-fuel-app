@@ -11,15 +11,33 @@ function query(result){
   return chain;
 }
 
-test('training plan service returns only the active plan sessions',async()=>{
+test('training plan service resolves the active plan first and loads only that plan calendar',async()=>{
+  const tables=[];
   const client={from(table){
-    if(table==='training_plan_calendar_with_fuel')return query({data:[{id:1,plan_id:'active'},{id:2,plan_id:'old'}],error:null});
+    tables.push(table);
     if(table==='training_plans')return query({data:{id:'active'},error:null});
+    if(table==='training_plan_calendar_with_fuel')return query({data:[{id:1,plan_id:'active'}],error:null});
     throw new Error(`Unexpected table ${table}`);
   }};
   const result=await fetchTrainingPlan(client,'user-1');
   assert.equal(result.error,null);
   assert.deepEqual(result.plan,[{id:1,plan_id:'active'}]);
+  assert.deepEqual(tables,['training_plans','training_plan_calendar_with_fuel']);
+});
+
+test('training plan falls back to the core calendar if enriched fuel calendar aborts',async()=>{
+  const fullError={message:'AbortError: signal is aborted without reason'};
+  const client={from(table){
+    if(table==='training_plans')return query({data:{id:'active'},error:null});
+    if(table==='training_plan_calendar_with_fuel')return query({data:null,error:fullError});
+    if(table==='training_plan_calendar')return query({data:[{id:'session-1',plan_id:'active',title:'Endurance'}],error:null});
+    throw new Error(`Unexpected table ${table}`);
+  }};
+  const result=await fetchTrainingPlan(client,'user-1');
+  assert.equal(result.error,null);
+  assert.equal(result.warning,fullError);
+  assert.equal(result.plan.length,1);
+  assert.equal(result.plan[0].title,'Endurance');
 });
 
 test('training history reads the deduplicated multisport metrics view and maps effective metrics plus JF load',async()=>{
