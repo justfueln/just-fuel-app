@@ -129,6 +129,11 @@ async function handOffLegacyWorker(){
 
 async function mountOnboarding(){
   if(window.__JF_ONBOARDING_ROOT__)return;
+  try{
+    const auth=await supabase.auth.getSession();
+    const uid=auth.data.session?.user?.id;
+    if(uid&&localStorage.getItem(`jf-onboarding-phase6-complete:${uid}`)==='1')return;
+  }catch{}
   let host=document.getElementById('jf-onboarding-root');
   if(!host){
     host=document.createElement('div');
@@ -168,9 +173,11 @@ function boot(){
 
   // First paint and signed-in Home data get an uncontested startup window.
   renderApp();
-  loadGlobalEnhancements();
   installAppUpdateWatcher();
   scheduleOnboarding();
+
+  // Analytics, bridge helpers and final UX polish are useful, but not first-paint work.
+  window.setTimeout(()=>loadGlobalEnhancements(),2500);
 
   // Legacy worker cleanup is maintenance, not startup work.
   window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},6000);
