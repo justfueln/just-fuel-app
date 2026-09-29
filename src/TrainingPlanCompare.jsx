@@ -28,8 +28,9 @@ export default function TrainingPlanCompare(){
     const active=await supabase.from('training_plans').select('id,race_goal_id,generated_at').eq('user_id',session.user.id).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle();
     if(active.error){setError(active.error.message);setLoading(false);return}
     if(!active.data?.id){setRows([]);setLoading(false);return}
-    await supabase.rpc('refresh_training_session_matches',{p_user_id:session.user.id});
-    const result=await supabase.from('training_plan_calendar_with_fuel').select('id,plan_id,session_date,title,session_type,duration_minutes,target_load,target_power_low_w,target_power_high_w,status,event_name,actual_activity_id,actual_name,actual_duration_minutes,actual_distance_km,actual_elevation_m,actual_avg_hr,actual_weighted_watts,actual_training_load,duration_completion_pct,load_completion_pct,match_score').eq('user_id',session.user.id).eq('plan_id',active.data.id).lte('session_date',todayKey()).order('session_date',{ascending:false});
+    // Matching is refreshed by the Strava sync pipeline. Opening this read-only view
+    // must not trigger a full matching rebuild or the heavyweight fuel calendar.
+    const result=await supabase.from('training_plan_calendar').select('id,plan_id,session_date,title,session_type,duration_minutes,target_load,target_power_low_w,target_power_high_w,status,event_name,actual_activity_id,actual_name,actual_duration_minutes,actual_distance_km,actual_elevation_m,actual_avg_hr,actual_weighted_watts,actual_training_load,duration_completion_pct,load_completion_pct,match_score').eq('user_id',session.user.id).eq('plan_id',active.data.id).lte('session_date',todayKey()).order('session_date',{ascending:false}).limit(120);
     if(result.error)setError(result.error.message);else{setRows(result.data||[]);setEventName(result.data?.[0]?.event_name||'')}
     setLoading(false);
   }
@@ -58,7 +59,7 @@ export default function TrainingPlanCompare(){
 
     <section className="card coach-card"><span className="eyebrow">COACH SAYS</span><h3>{coach}</h3></section>
 
-    {loading&&<section className="card empty"><Activity size={28}/><p>Matching plan to Strava training…</p></section>}
+    {loading&&<section className="card empty"><Activity size={28}/><p>Loading completed training…</p></section>}
     {error&&<div className="notice">{error}</div>}
     {!loading&&!error&&!rows.length&&<section className="card empty"><Timer size={28}/><p>No due sessions yet. This comparison will populate automatically after your first planned workout.</p></section>}
 
