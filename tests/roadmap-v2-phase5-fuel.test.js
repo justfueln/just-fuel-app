@@ -9,7 +9,7 @@ const registryUrl=new URL('../src/navigation-registry.js',import.meta.url);
 test('Fuel home is needs-first instead of a feature menu',async()=>{
   const source=await readFile(fuelUrl,'utf8');
   assert.match(source,/What do I need\?/);
-  assert.match(source,/UPCOMING TRAINING/);
+  assert.match(source,/YOUR FUEL TARGET/);
   assert.match(source,/NEXT RACE/);
   assert.match(source,/STOCK CHECK/);
   assert.match(source,/aria-label="Fuel actions"/);
