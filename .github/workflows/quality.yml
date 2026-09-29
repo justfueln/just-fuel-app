@@ -107,3 +107,29 @@ jobs:
             sed -n '1,60p' /tmp/jf-current.html 2>/dev/null >&2 || true
             exit 1
           fi
+
+  production-browser-smoke:
+    if: github.event_name == 'push'
+    needs: production-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify live production in Chromium
+        env:
+          JF_PRODUCTION_SMOKE: '1'
+          JF_PRODUCTION_URL: https://app.justfuelnutrition.co.za
+        run: npx playwright test tests/production-live.spec.js --reporter=line
