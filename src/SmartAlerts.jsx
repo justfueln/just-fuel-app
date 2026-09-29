@@ -11,19 +11,26 @@ export default function SmartAlerts({onAction,hidden=false}){
   const[alerts,setAlerts]=useState([]);
   const mounted=useRef(true);
   const loadToken=useRef(0);
+  const lastLoadAt=useRef(0);
 
-  async function load(){
+  async function load({force=false}={}){
+    const now=Date.now();
+    if(!force&&now-lastLoadAt.current<10000)return;
+    lastLoadAt.current=now;
     const token=++loadToken.current;
     const prefs=loadSmartAlertPrefs();
     if(!prefs.enabled){if(mounted.current)setAlerts([]);return}
     const auth=await supabase.auth.getSession();
     const session=auth.data.session||null;
     if(!session?.user){if(mounted.current)setAlerts([]);return}
-    const[dashboardResult,forecastResult]=await Promise.all([
-      fetchTodayDashboard(supabase,localDateKey()),
-      fetchTrainingFuelForecast(supabase,session.user.id)
-    ]);
+
+    // Dashboard first. Fuel forecasting is intentionally second so Smart Alerts
+    // never competes with the Home screen for database connections during startup.
+    const dashboardResult=await fetchTodayDashboard(supabase,localDateKey());
     if(!mounted.current||token!==loadToken.current)return;
+    const forecastResult=await fetchTrainingFuelForecast(supabase,session.user.id);
+    if(!mounted.current||token!==loadToken.current)return;
+
     const next=buildSmartAlerts({
       dashboard:dashboardResult.error?{}:normalizeDashboard(dashboardResult.dashboard),
       forecast:forecastResult.error?[]:forecastResult.fuel,
@@ -36,24 +43,35 @@ export default function SmartAlerts({onAction,hidden=false}){
 
   useEffect(()=>{
     mounted.current=true;
-    let timer=0,idleId=0;
-    const start=()=>load().catch(()=>{});
-    if('requestIdleCallback'in window)idleId=window.requestIdleCallback(start,{timeout:1200});
-    else timer=window.setTimeout(start,700);
+    let startTimer=0,refreshTimer=0,idleId=0;
+    const begin=()=>{
+      const run=()=>load().catch(()=>{});
+      if('requestIdleCallback'in window)idleId=window.requestIdleCallback(run,{timeout:1500});
+      else refreshTimer=window.setTimeout(run,250);
+    };
 
-    const refresh=()=>window.setTimeout(()=>load().catch(()=>{}),250);
+    // Non-critical alerts wait until the daily dashboard has had a clean head start.
+    startTimer=window.setTimeout(begin,4500);
+
+    const refresh=()=>{
+      window.clearTimeout(refreshTimer);
+      refreshTimer=window.setTimeout(()=>load({force:true}).catch(()=>{}),500);
+    };
     const strava=e=>{
       if(e?.detail?.plan_adaptation?.changed_sessions)saveStravaChangeTransient(e.detail);
       refresh();
     };
-    const visibility=()=>{if(document.visibilityState==='visible')load().catch(()=>{})};
+    const visibility=()=>{
+      if(document.visibilityState==='visible'&&Date.now()-lastLoadAt.current>15000)load().catch(()=>{});
+    };
     window.addEventListener('jf-strava-synced',strava);
     window.addEventListener('jf-training-plan-updated',refresh);
     window.addEventListener('jf-smart-alerts-refresh',refresh);
     document.addEventListener('visibilitychange',visibility);
     return()=>{
       mounted.current=false;
-      if(timer)window.clearTimeout(timer);
+      window.clearTimeout(startTimer);
+      window.clearTimeout(refreshTimer);
       if(idleId&&'cancelIdleCallback'in window)window.cancelIdleCallback(idleId);
       window.removeEventListener('jf-strava-synced',strava);
       window.removeEventListener('jf-training-plan-updated',refresh);

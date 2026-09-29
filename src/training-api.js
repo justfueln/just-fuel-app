@@ -1,5 +1,30 @@
 const OTP_SEND_COOLDOWN_MS=60000;
 const OTP_SEND_KEY='jf-training-otp-last-send';
+const requestCache=new Map();
+
+function cachedRequest(key,ttlMs,factory){
+  const now=Date.now();
+  const hit=requestCache.get(key);
+  if(hit&&hit.expiresAt>now)return hit.promise;
+  const entry={expiresAt:now+ttlMs,promise:null};
+  entry.promise=Promise.resolve().then(factory).catch(error=>{
+    if(requestCache.get(key)===entry)requestCache.delete(key);
+    throw error;
+  });
+  requestCache.set(key,entry);
+  return entry.promise;
+}
+
+function clearRequestCache(prefix=''){
+  for(const key of requestCache.keys())if(!prefix||key.startsWith(prefix))requestCache.delete(key);
+}
+
+async function runPostgrest(builder,timeoutMs){
+  if(typeof AbortController==='undefined'||typeof builder?.abortSignal!=='function')return await builder;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{return await builder.abortSignal(controller.signal)}finally{clearTimeout(timer)}
+}
 
 export async function fetchTrainingCore(client,userId){
   const[setup,home]=await Promise.all([
@@ -10,17 +35,22 @@ export async function fetchTrainingCore(client,userId){
 }
 
 export async function fetchTodayDashboard(client,today){
-  const result=await client.rpc('get_today_dashboard',{p_today:today});
-  return{dashboard:result.data||{},error:result.error||null};
+  return cachedRequest(`today-dashboard:${today}`,2500,async()=>{
+    const result=await runPostgrest(client.rpc('get_today_dashboard',{p_today:today}),1800);
+    return{dashboard:result.data||{},error:result.error||null};
+  });
 }
 
 export async function fetchTodayReadiness(client,userId,today){
-  const result=await client.from('training_readiness_checkins')
-    .select('id,checkin_date,sleep_quality,legs_freshness,soreness,motivation,resting_hr,note,score,status,load_ratio,suggested_factor,recommendation,target_session_id,adjustment_status,original_adjusted_minutes,applied_adjusted_minutes,updated_at')
-    .eq('user_id',userId)
-    .eq('checkin_date',today)
-    .maybeSingle();
-  return{readiness:result.data||null,error:result.error||null};
+  return cachedRequest(`today-readiness:${userId}:${today}`,2500,async()=>{
+    const query=client.from('training_readiness_checkins')
+      .select('id,checkin_date,sleep_quality,legs_freshness,soreness,motivation,resting_hr,note,score,status,load_ratio,suggested_factor,recommendation,target_session_id,adjustment_status,original_adjusted_minutes,applied_adjusted_minutes,updated_at')
+      .eq('user_id',userId)
+      .eq('checkin_date',today)
+      .maybeSingle();
+    const result=await runPostgrest(query,1200);
+    return{readiness:result.data||null,error:result.error||null};
+  });
 }
 
 export async function saveMorningReadiness(client,today,values){
@@ -34,6 +64,8 @@ export async function saveMorningReadiness(client,today,values){
     p_note:values.note||null
   });
   if(result.error)return{readiness:null,error:result.error};
+  clearRequestCache('today-readiness:');
+  clearRequestCache('today-dashboard:');
   const auth=await client.auth.getSession();
   const uid=auth.data.session?.user?.id;
   let adaptation=null,progression=null;
@@ -46,6 +78,9 @@ export async function saveMorningReadiness(client,today,values){
 
 export async function applyMorningReadinessAdjustment(client,today,accept){
   const result=await client.rpc('apply_training_readiness_adjustment',{p_today:today,p_accept:Boolean(accept)});
+  clearRequestCache('today-dashboard:');
+  clearRequestCache('today-readiness:');
+  clearRequestCache('fuel-forecast:');
   return{result:result.data||null,error:result.error||null};
 }
 
@@ -94,8 +129,10 @@ export async function fetchTrainingFuelBase(client,userId){
 }
 
 export async function fetchTrainingFuelForecast(client,userId){
-  const result=await client.rpc('get_training_fuel_forecast',{p_user_id:userId});
-  return{fuel:result.data||[],error:result.error||null};
+  return cachedRequest(`fuel-forecast:${userId}`,5000,async()=>{
+    const result=await runPostgrest(client.rpc('get_training_fuel_forecast',{p_user_id:userId}),3500);
+    return{fuel:result.data||[],error:result.error||null};
+  });
 }
 
 export async function fetchTrainingHistory(client,userId){
@@ -176,6 +213,9 @@ export async function syncTrainingStrava(client){
       }
     }catch{}
   }
+  clearRequestCache('today-dashboard:');
+  clearRequestCache('today-readiness:');
+  clearRequestCache('fuel-forecast:');
   if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('jf-strava-synced',{detail:result?.data||null}));
   return result;
 }
