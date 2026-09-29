@@ -75,6 +75,8 @@ test('non-power workout steps are repaired to the resolved sport target',async()
 
 test('expanded workout details prefer sport-aware target text and show hydration guidance',async()=>{
   const source=await readFile(new URL('../src/training-workout-details.js',import.meta.url),'utf8');
-  assert.match(source,/target_metric|target_hr|target_pace|target_rpe/);
-  assert.match(source,/hydration/i);
+  assert.match(source,/data\.target_text/);
+  assert.match(source,/secondary_target_text/);
+  assert.match(source,/hydration_ml_per_hour/);
+  assert.match(source,/sodium_target_mg_per_hour/);
 });
