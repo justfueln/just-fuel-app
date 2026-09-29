@@ -111,23 +111,23 @@ function MorningReadinessCard({readiness,session,onSaved,onApplied}){
 }
 
 export default function HomeIndex({goRoute}){
-  const[data,setData]=useState(null),[session,setSession]=useState(null),[readiness,setReadiness]=useState(null),[stockAlert,setStockAlert]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
+  const[data,setData]=useState(null),[session,setSession]=useState(null),[readiness,setReadiness]=useState(null),[readinessLoading,setReadinessLoading]=useState(true),[stockAlert,setStockAlert]=useState(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
 
   async function load(){
-    setLoading(true);setError('');
+    setLoading(true);setReadinessLoading(true);setError('');
     const auth=await supabase.auth.getSession();
     const current=auth.data.session||null;setSession(current);
-    if(!current?.user){setData(null);setReadiness(null);setStockAlert(null);setLoading(false);return}
-    const[dashboardResult,readinessResult]=await Promise.all([
-      fetchTodayDashboard(supabase,todayKey()),
-      fetchTodayReadiness(supabase,current.user.id,todayKey())
-    ]);
+    if(!current?.user){setData(null);setReadiness(null);setReadinessLoading(false);setStockAlert(null);setLoading(false);return}
+
+    const dashboardResult=await fetchTodayDashboard(supabase,todayKey());
     if(dashboardResult.error){setError('Your dashboard could not refresh right now. Training, Race and Fuel are still available below.');setData(null)}
     else setData(Array.isArray(dashboardResult.dashboard)?dashboardResult.dashboard[0]||{}:dashboardResult.dashboard||{});
-    setReadiness(readinessResult.error?null:readinessResult.readiness);
     setLoading(false);
 
-    // Stock is useful, but it must never delay first paint or the daily dashboard.
+    // Readiness and stock are useful, but neither may hold the main Home dashboard hostage.
+    fetchTodayReadiness(supabase,current.user.id,todayKey()).then(result=>{
+      if(!result.error)setReadiness(result.readiness);
+    }).catch(()=>{}).finally(()=>setReadinessLoading(false));
     fetchTrainingFuelForecast(supabase,current.user.id).then(result=>{
       if(!result.error)setStockAlert(stockAlertFromForecast(result.fuel));
     }).catch(()=>{});
@@ -140,7 +140,7 @@ export default function HomeIndex({goRoute}){
   const s=data?.next_session,r=data?.next_race,week=data?.week||{},next7=data?.next7||{},recent=data?.recent||{};
   const weekPct=progressPct(n(week.completed_sessions),n(week.planned_sessions));
 
-  const readinessSaved=value=>{setReadiness(value);window.dispatchEvent(new CustomEvent('jf-readiness-saved',{detail:value}));};
+  const readinessSaved=value=>{setReadiness(value);setReadinessLoading(false);window.dispatchEvent(new CustomEvent('jf-readiness-saved',{detail:value}));};
   const readinessApplied=result=>{
     setReadiness(prev=>prev?{...prev,adjustment_status:result?.status||prev.adjustment_status,applied_adjusted_minutes:result?.adjusted_minutes||prev.applied_adjusted_minutes,updated_at:new Date().toISOString()}:prev);
     if(result?.adjusted_minutes)setData(prev=>prev?.next_session&&sameDay(prev.next_session.date)?{...prev,next_session:{...prev.next_session,duration_minutes:result.adjusted_minutes}}:prev);
@@ -173,7 +173,7 @@ export default function HomeIndex({goRoute}){
       </section>
 
       <div className="today-action-grid">
-        <MorningReadinessCard readiness={readiness} session={s} onSaved={readinessSaved} onApplied={readinessApplied}/>
+        {readinessLoading&&!readiness?<section className="today-mini-card readiness readiness-loading"><div className="today-mini-title"><Target size={19}/><span>READINESS</span></div><strong>Loading readiness…</strong><p>Your workout is ready while the check-in loads in the background.</p></section>:<MorningReadinessCard readiness={readiness} session={s} onSaved={readinessSaved} onApplied={readinessApplied}/>}
         <section className="today-mini-card fuel-card">
           <div className="today-mini-title"><Fuel size={19}/><span>FUEL FOR THIS WORKOUT</span></div>
           {s?<><strong>{n(s.carbs_gph)?`${n(s.carbs_gph)} g/h`:'Hydration focus'}</strong><div className="today-fuel-grid"><span><b>{n(s.bottle_mix)}</b>Mix</span><span><b>{totalGels(s)}</b>Gels</span><span><b>{n(s.fluid_ml_h)}</b>ml/h</span><span><b>{n(s.sodium_mg_h)}</b>mg Na/h</span></div><button onClick={()=>goRoute('fuel',{fuelView:'training'})}>Open fuel plan<ChevronRight size={16}/></button></>:<><strong>—</strong><p>Your next workout does not have a fuel requirement yet.</p></>}
@@ -202,7 +202,7 @@ export default function HomeIndex({goRoute}){
         <div className="today-more-body">
           {n(week.planned_sessions)?<><div className="today-progress-copy"><strong>{n(week.completed_sessions)} of {n(week.planned_sessions)} sessions complete</strong><span>{mins(week.planned_minutes)} planned</span></div><div className="today-progress-track"><i style={{width:`${weekPct}%`}}/></div></>:<div className="today-progress-copy"><strong>{n(next7.planned_sessions)} planned session{n(next7.planned_sessions)===1?'':'s'}</strong><span>{mins(next7.planned_minutes)} over the next 7 days</span></div>}
           <div className="today-recent-grid"><div><b>{n(recent.hours_7d)} h</b><span>Last 7 days</span></div><div><b>{n(recent.distance_km_7d)} km</b><span>Distance</span></div><div><b>{n(recent.activities_7d)}</b><span>Activities</span></div></div>
-          {!readiness&&<div className={`today-load-line ${balance.tone}`}><Target size={17}/><div><strong>{balance.label}</strong><span>{balance.copy}</span></div></div>}
+          {!readiness&&!readinessLoading&&<div className={`today-load-line ${balance.tone}`}><Target size={17}/><div><strong>{balance.label}</strong><span>{balance.copy}</span></div></div>}
         </div>
       </details>
     </>}
