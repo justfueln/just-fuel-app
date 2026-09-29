@@ -11,19 +11,32 @@ function fmtShort(v){if(!v)return'';const d=new Date(`${String(v).slice(0,10)}T1
 function valueText(a){if(a?.value_num==null)return'';return `${Math.round(Number(a.value_num))}${a.unit==='W'?' W':a.unit?` ${a.unit}`:''}`}
 function improvementText(a){const now=Number(a?.value_num),before=Number(a?.previous_value_num);if(!Number.isFinite(now)||!Number.isFinite(before)||before<=0)return'';const pct=(now-before)/before*100;return pct>0?`+${pct.toFixed(pct>=10?0:1)}%`:''}
 function typeTone(type){return type==='ftp_improvement'?'ftp':type==='power_pb'?'pb':'sustained'}
+function choosePlan(rows,today){
+  const list=Array.isArray(rows)?rows:[];
+  return list.filter(p=>String(p.start_date||'0000-00-00')<=today&&String(p.race_date||'9999-12-31')>=today)
+    .sort((a,b)=>String(a.race_date||'9999-12-31').localeCompare(String(b.race_date||'9999-12-31'))||String(b.generated_at||'').localeCompare(String(a.generated_at||'')))[0]
+    ||list.filter(p=>String(p.start_date||'9999-12-31')>today).sort((a,b)=>String(a.start_date).localeCompare(String(b.start_date)))[0]
+    ||list[0]
+    ||null;
+}
 
 async function load(force=false){
   if(!force&&cacheAt&&Date.now()-cacheAt<45000)return{achievements,completionRows};
   if(loading)return loading;
   loading=(async()=>{
     const{data:{session}}=await sb.auth.getSession();if(!session?.user)return{achievements:[],completionRows:[]};
-    const uid=session.user.id;
-    try{await sb.rpc('refresh_training_achievements',{p_user_id:uid})}catch{}
+    const uid=session.user.id,today=new Date().toISOString().slice(0,10);
+    // Achievement calculation belongs to Strava/post-sync processing. Rendering this
+    // screen must stay read-only so opening Progress cannot trigger a backend rebuild.
+    const{data:plans}=await sb.from('training_plans').select('id,start_date,race_date,generated_at').eq('user_id',uid).eq('status','active').limit(20);
+    const plan=choosePlan(plans,today);
     const since=new Date(Date.now()-90*86400000).toISOString();
-    const[a,c]=await Promise.all([
-      sb.from('training_achievements').select('id,achievement_key,achievement_type,title,message,metric_label,value_num,previous_value_num,unit,activity_id,activity_date,source,metadata,seen_at,created_at').eq('user_id',uid).gte('created_at',since).order('created_at',{ascending:false}).limit(30),
-      sb.from('training_plan_calendar_with_fuel').select('id,title,session_date,actual_strava_activity_id,status').eq('user_id',uid).gte('session_date',new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order('session_date',{ascending:false})
-    ]);
+    const recentPlanDate=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
+    const achievementQuery=sb.from('training_achievements').select('id,achievement_key,achievement_type,title,message,metric_label,value_num,previous_value_num,unit,activity_id,activity_date,source,metadata,seen_at,created_at').eq('user_id',uid).gte('created_at',since).order('created_at',{ascending:false}).limit(30);
+    const completionQuery=plan?.id
+      ?sb.from('training_plan_calendar').select('id,title,session_date,actual_strava_activity_id,status').eq('user_id',uid).eq('plan_id',plan.id).gte('session_date',recentPlanDate).order('session_date',{ascending:false}).limit(60)
+      :Promise.resolve({data:[],error:null});
+    const[a,c]=await Promise.all([achievementQuery,completionQuery]);
     achievements=a.data||[];completionRows=(c.data||[]).map(x=>({...x,session_id:x.id}));cacheAt=Date.now();return{achievements,completionRows};
   })().finally(()=>{loading=null});
   return loading;
@@ -42,14 +55,11 @@ function coachCelebration(a){
   return 'Strong progress. Bank the result, recover well and let the training plan build on it.';
 }
 
-function clearInjected(){
-  document.querySelectorAll('.jf-achievement-home,.jf-achievement-history,.jf-achievement-inline').forEach(n=>n.remove());
-}
+function clearInjected(){document.querySelectorAll('.jf-achievement-home,.jf-achievement-history,.jf-achievement-inline').forEach(n=>n.remove())}
 
 function renderHome(data){
   const home=document.querySelector('.today-dashboard');if(!home)return;
-  const unseen=data.achievements.find(a=>!a.seen_at && new Date(a.created_at).getTime()>Date.now()-7*86400000);
-  if(!unseen)return;
+  const unseen=data.achievements.find(a=>!a.seen_at&&new Date(a.created_at).getTime()>Date.now()-7*86400000);if(!unseen)return;
   const card=el('section',`jf-achievement-home jf-achievement-${typeTone(unseen.achievement_type)}`);
   const top=el('div','jf-achievement-home-top');const copy=el('div','');copy.append(el('span','jf-achievement-kicker','NEW ACHIEVEMENT'),el('h3','',unseen.title));top.append(copy,el('div','jf-achievement-icon','★'));card.append(top);
   const metric=el('div','jf-achievement-home-metric');metric.append(el('strong','',valueText(unseen)||unseen.metric_label||'Progress'));const delta=improvementText(unseen);if(delta)metric.append(el('span','',delta));card.append(metric);
@@ -64,26 +74,20 @@ function renderPerformance(data){
   const head=el('div','jf-achievement-history-head');const left=el('div','');left.append(el('span','eyebrow','ACHIEVEMENTS'),el('h3','','Recent progress'));head.append(left,el('div','jf-achievement-icon','★'));card.append(head);
   card.append(el('p','muted','Personal bests and confirmed performance milestones detected from your synced training.'));
   const list=el('div','jf-achievement-list');
-  data.achievements.slice(0,8).forEach(a=>{
-    const row=el('div',`jf-achievement-row jf-achievement-${typeTone(a.achievement_type)}`);const main=el('div','');main.append(el('strong','',a.title),el('span','',`${fmtShort(a.activity_date||a.created_at)}${a.metadata?.activity_name?` · ${a.metadata.activity_name}`:''}`));const metric=el('div','jf-achievement-row-metric');metric.append(el('b','',valueText(a)||a.metric_label||'Milestone'));const delta=improvementText(a);if(delta)metric.append(el('small','',delta));row.append(main,metric);list.append(row);
-  });
+  data.achievements.slice(0,8).forEach(a=>{const row=el('div',`jf-achievement-row jf-achievement-${typeTone(a.achievement_type)}`);const main=el('div','');main.append(el('strong','',a.title),el('span','',`${fmtShort(a.activity_date||a.created_at)}${a.metadata?.activity_name?` · ${a.metadata.activity_name}`:''}`));const metric=el('div','jf-achievement-row-metric');metric.append(el('b','',valueText(a)||a.metric_label||'Milestone'));const delta=improvementText(a);if(delta)metric.append(el('small','',delta));row.append(main,metric);list.append(row)});
   card.append(list);
   const anchor=screen.querySelector('.jf-power-curve-card')||screen.querySelector('.jf-ftp-detection')||screen.querySelector('.performance-head');if(anchor)anchor.after(card);else screen.prepend(card);
 }
 
 function renderSessionCelebrations(data){
-  const byActivity=new Map();
-  for(const a of data.achievements){if(a.activity_id){const k=String(a.activity_id);if(!byActivity.has(k))byActivity.set(k,[]);byActivity.get(k).push(a)}}
-  if(!byActivity.size)return;
+  const byActivity=new Map();for(const a of data.achievements){if(a.activity_id){const k=String(a.activity_id);if(!byActivity.has(k))byActivity.set(k,[]);byActivity.get(k).push(a)}}if(!byActivity.size)return;
   const used=new Set();
   for(const card of document.querySelectorAll('.training-page .session-card')){
     const title=(card.querySelector('h3')?.textContent||'').trim();const date=(card.querySelector('.eyebrow')?.textContent||'').trim();
-    const row=data.completionRows.find(r=>!used.has(r.session_id)&&String(r.title||'').trim()===title&&fmtDate(r.session_date)===date&&r.actual_strava_activity_id);
-    if(!row)continue;used.add(row.session_id);const wins=byActivity.get(String(row.actual_strava_activity_id))||[];if(!wins.length)continue;
-    const box=el('div','jf-achievement-inline');box.append(el('span','jf-achievement-kicker','COACH CELEBRATION'));
-    const names=wins.slice(0,2).map(a=>a.title).join(' + ');box.append(el('strong','',names));
-    const details=wins.slice(0,2).map(a=>`${a.metric_label||'Power'} ${valueText(a)}`.trim()).join(' · ');if(details)box.append(el('p','',details));
-    box.append(el('small','',coachCelebration(wins[0])));
+    const row=data.completionRows.find(r=>!used.has(r.session_id)&&String(r.title||'').trim()===title&&fmtDate(r.session_date)===date&&r.actual_strava_activity_id);if(!row)continue;
+    used.add(row.session_id);const wins=byActivity.get(String(row.actual_strava_activity_id))||[];if(!wins.length)continue;
+    const box=el('div','jf-achievement-inline');box.append(el('span','jf-achievement-kicker','COACH CELEBRATION'));box.append(el('strong','',wins.slice(0,2).map(a=>a.title).join(' + ')));
+    const details=wins.slice(0,2).map(a=>`${a.metric_label||'Power'} ${valueText(a)}`.trim()).join(' · ');if(details)box.append(el('p','',details));box.append(el('small','',coachCelebration(wins[0])));
     const coach=card.querySelector('.jf-session-coach');if(coach)card.insertBefore(box,coach);else card.append(box);
   }
 }
@@ -98,6 +102,6 @@ function reset(){cacheAt=0;achievements=[];completionRows=[]}
 if(typeof window!=='undefined'){
   window.addEventListener('load',()=>queue());window.addEventListener('popstate',()=>queue());
   ['jf-training-plan-updated','jf-training-feedback-saved','jf-recovery-logged','jf-strava-synced','jf-training-achievements-refresh'].forEach(name=>window.addEventListener(name,()=>{reset();queue(true)}));
-  const start=()=>{if(!document.body)return;new MutationObserver(m=>{if(m.some(x=>x.addedNodes.length||x.removedNodes.length))queue()}).observe(document.body,{childList:true,subtree:true});queue()};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  document.addEventListener('click',e=>{if(e.target?.closest?.('.training-progress-nav,.training-phase2-nav'))setTimeout(()=>queue(),0)});
+  queue();
 }

@@ -14,10 +14,16 @@ test('Training overview uses the fast bounded core RPC instead of heavyweight su
   assert.doesNotMatch(core,/training_setup_status/);
 });
 
-test('Training plan resolves the active plan first and avoids the heavyweight fuel calendar',async()=>{
+test('Training plan resolves the date-aware current plan first and avoids the heavyweight fuel calendar',async()=>{
   const api=await readFile(apiUrl,'utf8');
+  const current=api.slice(api.indexOf('async function fetchCurrentPlan'),api.indexOf('function normalizeDashboard'));
+  assert.match(current,/training_plans/);
+  assert.match(current,/start_date/);
+  assert.match(current,/race_date/);
+  assert.match(current,/\.limit\(20\)/);
+  assert.match(current,/chooseCurrentPlan/);
   const plan=api.slice(api.indexOf('export async function fetchTrainingPlan'),api.indexOf('export async function fetchFuelTrainingPlan'));
-  assert.match(plan,/training_plans/);
+  assert.match(plan,/fetchCurrentPlan/);
   assert.match(plan,/training_plan_calendar/);
   assert.match(plan,/\.eq\('plan_id',activePlanId\)/);
   assert.doesNotMatch(plan,/training_plan_calendar_with_fuel/);

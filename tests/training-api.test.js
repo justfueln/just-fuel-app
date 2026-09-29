@@ -13,12 +13,15 @@ function query(result,{onEq}={}){
   return chain;
 }
 
-test('training plan service returns only the active plan sessions',async()=>{
+test('training plan prefers the plan that is in progress over a newer future plan',async()=>{
   const tables=[];
   const filters=[];
   const client={from(table){
     tables.push(table);
-    if(table==='training_plans')return query({data:{id:'active'},error:null},{onEq:(column,value)=>filters.push([table,column,value])});
+    if(table==='training_plans')return query({data:[
+      {id:'future',start_date:'2099-01-01',race_date:'2099-02-01',generated_at:'2098-12-31T12:00:00Z'},
+      {id:'active',start_date:'2000-01-01',race_date:'2098-12-31',generated_at:'2020-01-01T12:00:00Z'}
+    ],error:null},{onEq:(column,value)=>filters.push([table,column,value])});
     if(table==='training_plan_calendar')return query({data:[{id:1,plan_id:'active'}],error:null},{onEq:(column,value)=>filters.push([table,column,value])});
     throw new Error(`Unexpected table ${table}`);
   }};

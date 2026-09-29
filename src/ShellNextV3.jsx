@@ -70,6 +70,9 @@ export default function ShellNextV3(){
     const target=trainingTargetForView(value);
     setTrainingView(target.id);
     window.history.pushState({...window.history.state,jfSection:'training',jfTrainingTab:target.legacyTab,jfTrainingView:target.id,jfTrainingSubView:target.subView,jfProfile:false,jfBasket:false},'',window.location.href);
+    // AppV3 already owns a popstate listener for its legacy tab state. Dispatch the
+    // new state without remounting the whole Training tree and re-running auth/data.
+    window.dispatchEvent(new PopStateEvent('popstate',{state:window.history.state}));
     resetScroll();
   }
   function openProfile(){if(profileOpen)return;setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:section,jfProfile:true,jfBasket:false},'',window.location.href);resetScroll()}
@@ -105,7 +108,7 @@ export default function ShellNextV3(){
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
   },[]);
 
-  useEffect(()=>{loadEnhancementsForSection(section)},[section]);
+  useEffect(()=>{loadEnhancementsForSection(section,{trainingView})},[section,trainingView]);
   useEffect(()=>{if(basket.length)localStorage.setItem(BASKET_KEY,JSON.stringify({savedAt:Date.now(),items:basket}));else localStorage.removeItem(BASKET_KEY)},[basket]);
   useEffect(()=>{if(lastBasket.length)localStorage.setItem(LAST_BASKET_KEY,JSON.stringify({savedAt:Date.now(),items:lastBasket}))},[lastBasket]);
   useEffect(()=>{
@@ -136,7 +139,7 @@ export default function ShellNextV3(){
     {(!isTrainingArea||profileOpen)&&<CurrentAppHeader count={basketCount} onBasket={openBasket} onProfile={profileOpen?closeProfile:openProfile} profileOpen={profileOpen}/>} 
     {isTrainingArea&&!profileOpen&&<><button className="training-profile-button" onClick={openProfile} aria-label="Profile and settings"><UserRound size={21}/></button><button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button></>}
     {reminderDue&&!isTrainingArea&&!profileOpen&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('fuel',{fuelView:'planner'});dismissReminder()}} onDismiss={dismissReminder}/>} 
-    {!reminderDue&&!profileOpen&&!basketOpen&&<SmartAlerts onAction={openSmartAlert} hidden={isTrainingArea}/>} 
+    {!reminderDue&&!profileOpen&&!basketOpen&&!isTrainingArea&&<SmartAlerts onAction={openSmartAlert}/>} 
 
     <div className="shell-content">
       <Suspense fallback={<RouteLoading/>}>
@@ -145,7 +148,7 @@ export default function ShellNextV3(){
           {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
           {section==='training'&&<TrainingPhaseNav value={trainingView} onChange={openTrainingView}/>} 
           {section==='fuel'&&<FuelHubV2 addLine={addLine} openBasket={openBasket} viewTarget={fuelView} onViewChange={setFuelView}/>} 
-          {section==='training'&&<TrainingApp key={`training-${trainingView}`}/>} 
+          {section==='training'&&<TrainingApp/>} 
           {section==='race'&&<RaceApp/>}
         </>}
       </Suspense>

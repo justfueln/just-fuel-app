@@ -10,6 +10,14 @@ function todayKey(){const d=new Date();return`${d.getFullYear()}-${pad(d.getMont
 function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).format(new Date(`${v}T12:00:00`))}
 function statusLabel(v){return v==='ready'?'READY':v==='caution'?'CAUTION':'RECOVERY'}
 function el(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node}
+function choosePlan(rows,today){
+  const list=Array.isArray(rows)?rows:[];
+  return list.filter(p=>String(p.start_date||'0000-00-00')<=today&&String(p.race_date||'9999-12-31')>=today)
+    .sort((a,b)=>String(a.race_date||'9999-12-31').localeCompare(String(b.race_date||'9999-12-31'))||String(b.generated_at||'').localeCompare(String(a.generated_at||'')))[0]
+    ||list.filter(p=>String(p.start_date||'9999-12-31')>today).sort((a,b)=>String(a.start_date).localeCompare(String(b.start_date)))[0]
+    ||list[0]
+    ||null;
+}
 
 async function load(force=false){
   if(!force&&cache&&Date.now()-cacheAt<45000)return cache;
@@ -17,11 +25,11 @@ async function load(force=false){
   const uid=session.user.id,today=todayKey();
   const[readyResult,planResult]=await Promise.all([
     sb.from('training_readiness_checkins').select('checkin_date,score,status,recommendation,target_session_id,adjustment_status,applied_adjusted_minutes,updated_at').eq('user_id',uid).eq('checkin_date',today).maybeSingle(),
-    sb.from('training_plans').select('id').eq('user_id',uid).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle()
+    sb.from('training_plans').select('id,start_date,race_date,generated_at').eq('user_id',uid).eq('status','active').limit(20)
   ]);
-  const planId=planResult.data?.id;let row=null;
+  const planId=choosePlan(planResult.data,today)?.id;let row=null;
   if(planId){
-    const r=await sb.from('training_plan_calendar_with_fuel').select('id,title,session_date,status').eq('user_id',uid).eq('plan_id',planId).eq('session_date',today).order('is_key_session',{ascending:false}).limit(1).maybeSingle();
+    const r=await sb.from('training_plan_calendar').select('id,title,session_date,status,is_key_session').eq('user_id',uid).eq('plan_id',planId).eq('session_date',today).order('is_key_session',{ascending:false}).limit(1).maybeSingle();
     row=r.data||null;
   }
   cache={readiness:readyResult.data||null,row};cacheAt=Date.now();return cache;
@@ -59,6 +67,6 @@ if(typeof window!=='undefined'){
   window.addEventListener('load',()=>queue());
   window.addEventListener('popstate',()=>queue());
   ['jf-readiness-saved','jf-training-plan-updated'].forEach(name=>window.addEventListener(name,()=>{reset();queue(true)}));
-  const start=()=>{if(!document.body)return;new MutationObserver(m=>{if(m.some(x=>x.addedNodes.length||x.removedNodes.length))queue()}).observe(document.body,{childList:true,subtree:true});queue()};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  document.addEventListener('change',e=>{if(e.target?.closest?.('.plan-view-select'))queue()});
+  queue();
 }

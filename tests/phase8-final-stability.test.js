@@ -31,7 +31,7 @@ test('training history has a client-side duplicate safety net',async()=>{
     select(){return this},
     eq(){return this},
     order(){return this},
-    async range(){return{data:rows,error:null}}
+    limit(){return Promise.resolve({data:rows,error:null})}
   };
   const client={from(name){assert.equal(name,'training_activity_metrics');return chain}};
   const result=await fetchTrainingHistory(client,'user-1');
