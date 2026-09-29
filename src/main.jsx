@@ -175,7 +175,7 @@ function boot(){
   renderApp();
 
   // Keep helpers ordered after render for stability while still deferring the heavy work.
-  window.setTimeout(()=>loadGlobalEnhancements(),2500);
+  window.setTimeout(()=>{loadGlobalEnhancements();},2500);
   installAppUpdateWatcher();
   scheduleOnboarding();
 
