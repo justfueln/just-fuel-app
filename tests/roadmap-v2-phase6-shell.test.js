@@ -5,11 +5,14 @@ import {readFile} from 'node:fs/promises';
 const mainUrl=new URL('../src/main.jsx',import.meta.url);
 const gateUrl=new URL('../src/AthleteOnboardingGate.jsx',import.meta.url);
 
-test('onboarding is lazy and deferred so first paint stays fast',async()=>{
+test('onboarding mounts once in its own deferred root so first paint stays fast',async()=>{
   const source=await readFile(mainUrl,'utf8');
-  assert.match(source,/React\.lazy\(\(\)=>import\('\.\/AthleteOnboardingGate'\)\)/);
+  assert.match(source,/await import\('\.\/AthleteOnboardingGate'\)/);
   assert.match(source,/requestIdleCallback/);
-  assert.match(source,/<ShellNextV3\s*\/>[\s\S]*<DeferredOnboarding\s*\/>/);
+  assert.match(source,/getElementById\('jf-onboarding-root'\)/);
+  assert.match(source,/if\(onboardingRoot\)return/);
+  assert.match(source,/scheduleOnboarding\(\)/);
+  assert.doesNotMatch(source,/<DeferredOnboarding\s*\/>/);
 });
 
 test('phase 6 keeps advanced athlete metrics optional',async()=>{
@@ -18,4 +21,5 @@ test('phase 6 keeps advanced athlete metrics optional',async()=>{
   assert.doesNotMatch(source,/if\(!draft\.ftp/);
   assert.doesNotMatch(source,/if\(!draft\.weight/);
   assert.match(source,/Race setup is optional/);
+  assert.match(source,/add a target race later from Race/);
 });
