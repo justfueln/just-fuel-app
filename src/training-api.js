@@ -190,30 +190,30 @@ export async function fetchTrainingFuelForecast(client,userId){
 
 export async function fetchTrainingHistory(client,userId){
   const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,effective_average_heartrate,effective_max_heartrate,effective_average_cadence,effective_average_watts,effective_weighted_average_watts,effective_kilojoules,effective_calories,trainer,manual,had_duplicate,duplicate_confidence,synced_at,estimated_training_load,load_source,load_confidence,sport_family';
+  // Initial Progress rendering only needs recent training. Keeping this request bounded
+  // prevents large Strava histories from locking the UI while preserving 6-month trends.
+  const result=await safePostgrest(
+    client.from('training_activity_metrics').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).limit(250),
+    2200
+  );
+  if(result.error)return{history:[],error:result.error};
   const rows=[];
   const seen=new Set();
-  const pageSize=500;
-  for(let from=0;;from+=pageSize){
-    const result=await safePostgrest(client.from('training_activity_metrics').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).range(from,from+pageSize-1),2500);
-    if(result.error)return{history:[],error:result.error};
-    const page=result.data||[];
-    for(const row of page){
-      const key=row.strava_activity_id!=null?`strava:${row.strava_activity_id}`:`row:${row.id}`;
-      if(seen.has(key))continue;
-      seen.add(key);
-      rows.push({
-        ...row,
-        average_heartrate:row.effective_average_heartrate,
-        max_heartrate:row.effective_max_heartrate,
-        average_cadence:row.effective_average_cadence,
-        average_watts:row.effective_average_watts,
-        weighted_average_watts:row.effective_weighted_average_watts,
-        kilojoules:row.effective_kilojoules,
-        calories:row.effective_calories,
-        raw:{suffer_score:Number(row.estimated_training_load)||0,jf_load_source:row.load_source,jf_load_confidence:row.load_confidence}
-      });
-    }
-    if(page.length<pageSize)break;
+  for(const row of result.data||[]){
+    const key=row.strava_activity_id!=null?`strava:${row.strava_activity_id}`:`row:${row.id}`;
+    if(seen.has(key))continue;
+    seen.add(key);
+    rows.push({
+      ...row,
+      average_heartrate:row.effective_average_heartrate,
+      max_heartrate:row.effective_max_heartrate,
+      average_cadence:row.effective_average_cadence,
+      average_watts:row.effective_average_watts,
+      weighted_average_watts:row.effective_weighted_average_watts,
+      kilojoules:row.effective_kilojoules,
+      calories:row.effective_calories,
+      raw:{suffer_score:Number(row.estimated_training_load)||0,jf_load_source:row.load_source,jf_load_confidence:row.load_confidence}
+    });
   }
   return{history:rows,error:null};
 }
@@ -243,7 +243,10 @@ export async function verifyTrainingOtp(client,email,token){
 
 export async function syncTrainingStrava(client){
   const result=await client.functions.invoke('strava-sync',{body:{}});
-  if(!result.error){
+  // The deployed sync function already performs matching, adaptation, progression and
+  // target refreshes. Only run the legacy browser refresh chain if the backend
+  // explicitly asks for it; otherwise it duplicates expensive work and can time out.
+  if(!result.error&&result.data?.client_refresh_required===true){
     try{
       const auth=await client.auth.getSession();
       const uid=auth.data.session?.user?.id;
