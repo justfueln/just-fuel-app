@@ -2,6 +2,7 @@ import './final-ux-v10.css';
 
 let observer=null;
 let lastSection='';
+let queued=false;
 
 function ensureSkipLink(){
   if(document.querySelector('.jf-skip-link'))return;
@@ -40,7 +41,6 @@ function improveStatusSemantics(){
     if(!node.hasAttribute('role'))node.setAttribute('role','status');
     if(!node.hasAttribute('aria-live'))node.setAttribute('aria-live','polite');
   });
-  document.querySelectorAll('button[disabled]').forEach(button=>button.setAttribute('aria-disabled','true'));
 }
 
 function trackSection(){
@@ -59,16 +59,19 @@ function apply(){
   trackSection();
 }
 
+function schedule(){
+  if(queued)return;
+  queued=true;
+  requestAnimationFrame(()=>{queued=false;apply()});
+}
+
 function start(){
   apply();
   if(observer)return;
-  let queued=false;
-  observer=new MutationObserver(()=>{
-    if(queued)return;
-    queued=true;
-    requestAnimationFrame(()=>{queued=false;apply()});
-  });
-  observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class','disabled']});
+  observer=new MutationObserver(schedule);
+  observer.observe(document.body,{subtree:true,childList:true});
+  document.addEventListener('click',schedule,{passive:true});
+  window.addEventListener('popstate',schedule);
 }
 
 if(typeof window!=='undefined'){
