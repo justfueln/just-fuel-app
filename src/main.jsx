@@ -173,11 +173,11 @@ function boot(){
 
   // First paint and signed-in Home data get an uncontested startup window.
   renderApp();
+
+  // Keep helpers ordered after render for stability while still deferring the heavy work.
+  window.setTimeout(()=>loadGlobalEnhancements(),2500);
   installAppUpdateWatcher();
   scheduleOnboarding();
-
-  // Analytics, bridge helpers and final UX polish are useful, but not first-paint work.
-  window.setTimeout(()=>loadGlobalEnhancements(),2500);
 
   // Legacy worker cleanup is maintenance, not startup work.
   window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},6000);
