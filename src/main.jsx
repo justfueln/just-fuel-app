@@ -50,9 +50,10 @@ import './training-achievements-v1.css';
 import './race-goal-progress-v1.css';
 import './race-fuel-rehearsal-v1.css';
 
-const AthleteOnboardingGate=React.lazy(()=>import('./AthleteOnboardingGate'));
 const CURRENT_APP_VERSION='16';
 const PWA_CLEAN_KEY=`jf-pwa-clean-v${CURRENT_APP_VERSION}`;
+let onboardingScheduled=false;
+let onboardingRoot=null;
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -128,20 +129,26 @@ async function handOffLegacyWorker(){
   }
 }
 
-function DeferredOnboarding(){
-  const[ready,setReady]=React.useState(false);
-  React.useEffect(()=>{
-    let cancelled=false;
-    const start=()=>{if(!cancelled)setReady(true)};
-    if('requestIdleCallback' in window){
-      const id=window.requestIdleCallback(start,{timeout:900});
-      return()=>{cancelled=true;try{window.cancelIdleCallback?.(id)}catch{}};
-    }
-    const id=window.setTimeout(start,350);
-    return()=>{cancelled=true;window.clearTimeout(id)};
-  },[]);
-  if(!ready)return null;
-  return <React.Suspense fallback={null}><AthleteOnboardingGate/></React.Suspense>;
+async function mountOnboarding(){
+  if(onboardingRoot)return;
+  let host=document.getElementById('jf-onboarding-root');
+  if(!host){
+    host=document.createElement('div');
+    host.id='jf-onboarding-root';
+    document.body.appendChild(host);
+  }
+  const{default:AthleteOnboardingGate}=await import('./AthleteOnboardingGate');
+  if(onboardingRoot)return;
+  onboardingRoot=ReactDOM.createRoot(host);
+  onboardingRoot.render(<ErrorBoundary><AthleteOnboardingGate/></ErrorBoundary>);
+}
+
+function scheduleOnboarding(){
+  if(onboardingScheduled)return;
+  onboardingScheduled=true;
+  const start=()=>mountOnboarding().catch(error=>console.warn('Athlete onboarding could not load:',error));
+  if('requestIdleCallback' in window)window.requestIdleCallback(start,{timeout:900});
+  else window.setTimeout(start,350);
 }
 
 function renderApp(){
@@ -150,7 +157,6 @@ function renderApp(){
       <ErrorBoundary>
         <NetworkStatus />
         <ShellNextV3 />
-        <DeferredOnboarding />
       </ErrorBoundary>
     </React.StrictMode>
   );
@@ -160,10 +166,11 @@ function boot(){
   try{document.cookie='jf_shell_v16=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
 
   // Keep first paint lean. Global helpers load only after the shell is visible,
-  // while Training/Race enhancements and onboarding are loaded after first paint.
+  // while Training/Race enhancements and onboarding remain deferred.
   renderApp();
   loadGlobalEnhancements();
   installAppUpdateWatcher();
+  scheduleOnboarding();
 
   // Retire any old service worker after the current shell is already visible.
   window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},0);
