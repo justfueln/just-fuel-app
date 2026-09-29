@@ -32,5 +32,6 @@ test('smart coaching remains route-scoped so startup performance hotfix is prese
   assert.match(loader,/if\(section==='home'\)idle\(\(\)=>ensureSmartCoach\(\),900\)/);
   assert.match(loader,/section==='training'/);
   assert.match(loader,/ensureSmartCoach\(\)/);
-  assert.doesNotMatch(loader,/loadGlobalEnhancements\(\)[\s\S]*smart-coach-v2/);
+  const globalBody=loader.slice(loader.indexOf('export function loadGlobalEnhancements'),loader.indexOf('export function loadEnhancementsForSection'));
+  assert.doesNotMatch(globalBody,/smart-coach-v2|ensureSmartCoach/);
 });
