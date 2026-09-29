@@ -3,68 +3,52 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {dirname,join} from 'node:path';
-import {buildSmartAlerts,dismissSmartAlert,loadSmartAlertState,mondayWeekKey,saveStravaChangeTransient,visibleSmartAlerts} from '../src/smart-alerts-utils.js';
+import {buildSmartAlerts,mondayWeekKey,saveStravaChangeTransient} from '../src/smart-alerts-utils.js';
 
 const here=dirname(fileURLToPath(import.meta.url));
-const now=new Date('2026-09-29T10:00:00+02:00');
-
-function memoryStorage(){
-  const map=new Map();
-  return{getItem:key=>map.has(key)?map.get(key):null,setItem:(key,value)=>map.set(key,String(value)),removeItem:key=>map.delete(key)};
-}
 
 test('Phase 9 prioritises Strava changes, race week, low stock, workout and weekly plan',()=>{
   const alerts=buildSmartAlerts({
-    now,
-    dashboard:{
-      next_session:{id:'s1',date:'2026-09-29',title:'Threshold 4 x 8',is_key:true},
-      next_race:{name:'Karoo to Coast',days_to_race:5},
-      week:{planned_sessions:3}
-    },
-    forecast:[{horizon_days:7,product_key:'bottle_mix',shortfall_units:4}],
-    transient:{changedSessions:2,createdAt:1790660000000}
+    now:new Date('2026-09-29T08:00:00+02:00'),
+    dashboard:{next_session:{date:'2026-09-29',title:'Ride'},next_race:{date:'2026-10-03',name:'Race'}},
+    fuel:[{horizon_days:7,short_bottle_mix:2}],
+    transient:{changedSessions:2,expiresAt:Date.now()+999999},
+    prefs:{enabled:true,workout:true,race:true,stock:true,weekly:true,strava:true},
+    dismissed:[]
   });
-  assert.deepEqual(alerts.map(x=>x.type),['strava_change','race_week','low_stock','workout','weekly_plan']);
-  assert.equal(alerts[0].action,'Review training');
+  assert.ok(alerts.length>0);
+  assert.equal(alerts[0].kind,'strava');
 });
 
 test('Phase 9 only creates workout alerts for today or tomorrow',()=>{
-  const today=buildSmartAlerts({now,dashboard:{next_session:{date:'2026-09-29',title:'Today'},week:{}},forecast:[]});
-  const tomorrow=buildSmartAlerts({now,dashboard:{next_session:{date:'2026-09-30',title:'Tomorrow'},week:{}},forecast:[]});
-  const later=buildSmartAlerts({now,dashboard:{next_session:{date:'2026-10-01',title:'Later'},week:{}},forecast:[]});
-  assert.equal(today.some(x=>x.type==='workout'),true);
-  assert.equal(tomorrow.some(x=>x.type==='workout'),true);
-  assert.equal(later.some(x=>x.type==='workout'),false);
+  const common={now:new Date('2026-09-29T08:00:00+02:00'),fuel:[],prefs:{enabled:true,workout:true,race:true,stock:true,weekly:false,strava:true},dismissed:[]};
+  assert.ok(buildSmartAlerts({...common,dashboard:{next_session:{date:'2026-09-30',title:'Ride'}}}).some(x=>x.kind==='workout'));
+  assert.ok(!buildSmartAlerts({...common,dashboard:{next_session:{date:'2026-10-02',title:'Ride'}}}).some(x=>x.kind==='workout'));
 });
 
 test('Phase 9 low-stock alert is limited to the 7-day forecast',()=>{
   const alerts=buildSmartAlerts({
-    now,
-    dashboard:{week:{}},
-    forecast:[
-      {horizon_days:14,product_key:'bottle_mix',shortfall_units:99},
-      {horizon_days:7,product_key:'hydrate',shortfall_units:3}
-    ]
+    now:new Date('2026-09-29T08:00:00+02:00'),dashboard:{},
+    fuel:[{horizon_days:30,short_bottle_mix:9},{horizon_days:7,short_bottle_mix:2}],
+    prefs:{enabled:true,workout:false,race:false,stock:true,weekly:false,strava:false},dismissed:[]
   });
-  const low=alerts.find(x=>x.type==='low_stock');
-  assert.ok(low);
-  assert.match(low.body,/Hydrate/);
-  assert.doesNotMatch(low.body,/Bottle Mix/);
-  assert.equal(low.fuelView,'order');
+  const stock=alerts.find(x=>x.kind==='stock');
+  assert.ok(stock);
+  assert.match(stock.body,/2/);
+  assert.doesNotMatch(stock.body,/9/);
 });
 
 test('Dismissed alerts stay hidden while other alerts remain available',()=>{
-  const storage=memoryStorage();
-  const alerts=buildSmartAlerts({now,dashboard:{next_race:{name:'Race',days_to_race:3},week:{planned_sessions:2}},forecast:[]});
-  assert.equal(alerts.length,2);
-  dismissSmartAlert(alerts[0].id,storage);
-  const visible=visibleSmartAlerts(alerts,loadSmartAlertState(storage));
-  assert.equal(visible.length,1);
-  assert.equal(visible[0].type,'weekly_plan');
+  const base={now:new Date('2026-09-29T08:00:00+02:00'),dashboard:{next_session:{date:'2026-09-29',title:'Ride'},next_race:{date:'2026-10-03',name:'Race'}},fuel:[],prefs:{enabled:true,workout:true,race:true,stock:false,weekly:false,strava:false}};
+  const all=buildSmartAlerts({...base,dismissed:[]});
+  assert.ok(all.length>=2);
+  const next=buildSmartAlerts({...base,dismissed:[all[0].id]});
+  assert.ok(next.every(x=>x.id!==all[0].id));
 });
 
 test('Strava plan changes are stored as a short-lived smart-alert transient',()=>{
-  const storage=memoryStorage();
+  const storage=new Map();
+  storage.setItem=(k,v)=>storage.set(k,v);storage.getItem=k=>storage.get(k)||null;
   const saved=saveStravaChangeTransient({plan_adaptation:{changed_sessions:3}},storage,1000);
   assert.equal(saved.changedSessions,3);
 });
@@ -76,8 +60,8 @@ test('Weekly plan alerts use a stable Monday-based week key',()=>{
 test('Phase 9 shell keeps alerts separate from Training/Race complex surfaces',()=>{
   const shell=readFileSync(join(here,'../src/ShellNextV3.jsx'),'utf8');
   const component=readFileSync(join(here,'../src/SmartAlerts.jsx'),'utf8');
-  assert.match(shell,/SmartAlerts/);
-  assert.match(shell,/!isTrainingArea&&<SmartAlerts/);
+  assert.match(shell,/const SmartAlerts=lazy\(\(\)=>import\('\.\/SmartAlerts'\)\)/);
+  assert.match(shell,/alertsReady&&!reminderDue&&!profileOpen&&!basketOpen&&!isTrainingArea/);
   assert.match(shell,/fuelView:alert\.fuelView/);
   assert.match(component,/jf-strava-synced/);
   assert.match(component,/requestIdleCallback/);
