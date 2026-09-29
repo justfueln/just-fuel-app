@@ -11,18 +11,26 @@ function label(v){return v==='progress'?'PROGRESS':v==='hold'?'HOLD':v==='protec
 function title(v){return v==='progress'?'Coach progressed this workout':v==='hold'?'Progression held for now':v==='protect'?'Recovery load protected':'Building progression evidence'}
 function evaluated(row){return Boolean(row?.progression_applied_at||row?.progression_reason)}
 function datePlus(days){const d=new Date();d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
+function choosePlan(rows,today){
+  const list=Array.isArray(rows)?rows:[];
+  return list.filter(p=>String(p.start_date||'0000-00-00')<=today&&String(p.race_date||'9999-12-31')>=today)
+    .sort((a,b)=>String(a.race_date||'9999-12-31').localeCompare(String(b.race_date||'9999-12-31'))||String(b.generated_at||'').localeCompare(String(a.generated_at||'')))[0]
+    ||list.filter(p=>String(p.start_date||'9999-12-31')>today).sort((a,b)=>String(a.start_date).localeCompare(String(b.start_date)))[0]
+    ||list[0]
+    ||null;
+}
 
 async function load(force=false){
   if(!force&&cache&&Date.now()-cacheAt<45000)return cache;
   if(loading)return loading;
   loading=(async()=>{
     const{data:{session}}=await sb.auth.getSession();if(!session?.user)return null;
-    const uid=session.user.id;
-    const{data:plan}=await sb.from('training_plans').select('id').eq('user_id',uid).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle();
-    if(!plan?.id)return null;
+    const uid=session.user.id,today=new Date().toISOString().slice(0,10);
+    const{data:plans}=await sb.from('training_plans').select('id,start_date,race_date,generated_at').eq('user_id',uid).eq('status','active').limit(20);
+    const plan=choosePlan(plans,today);if(!plan?.id)return null;
     const{data:rows,error}=await sb.from('training_plan_calendar')
       .select('id,title,session_date,session_type,planned_duration_minutes,duration_minutes,target_power_low_w,target_power_high_w,progression_status,progression_factor,progression_reason,progression_source_count,progression_applied_at')
-      .eq('user_id',uid).eq('plan_id',plan.id).gte('session_date',new Date().toISOString().slice(0,10)).lte('session_date',datePlus(56)).order('session_date',{ascending:true}).limit(60);
+      .eq('user_id',uid).eq('plan_id',plan.id).gte('session_date',today).lte('session_date',datePlus(56)).order('session_date',{ascending:true}).limit(60);
     if(error)throw error;
     const list=rows||[];
     cache={rows:list,rowMap:new Map(list.map(x=>[x.id,x]))};cacheAt=Date.now();return cache;
