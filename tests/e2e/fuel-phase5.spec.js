@@ -56,10 +56,20 @@ test('Fuel Phase 5 answers what the athlete needs before exposing detailed tools
   await page.getByRole('button',{name:'Fuel',exact:true}).click();
 
   await expect(page.getByRole('heading',{name:'What do I need?'})).toBeVisible();
-  const trainingCard=page.locator('.fuel-v3-need-card');
-  await expect(trainingCard.getByText('UPCOMING TRAINING')).toBeVisible();
-  await expect(trainingCard.getByText(/Endurance ride/)).toBeVisible();
-  await expect(trainingCard.getByText('2',{exact:true}).first()).toBeVisible();
+  const targetCard=page.locator('.fuel-v4-target-card');
+  await expect(targetCard.getByText('YOUR FUEL TARGET')).toBeVisible();
+  await expect(targetCard.getByText(/Endurance ride/)).toBeVisible();
+  const targetGrid=targetCard.locator('.fuel-v4-target-grid');
+  await expect(targetGrid.getByText('60',{exact:true})).toBeVisible();
+  await expect(targetGrid.getByText('600',{exact:true})).toBeVisible();
+  await expect(targetGrid.getByText('900',{exact:true})).toBeVisible();
+  await expect(targetGrid.getByText('g carbs / hour')).toBeVisible();
+  await expect(targetGrid.getByText('ml fluid / hour')).toBeVisible();
+  await expect(targetGrid.getByText('mg sodium / hour')).toBeVisible();
+  await expect(targetCard.getByText('Next 7 days',{exact:true})).toBeVisible();
+  await expect(targetCard.getByText('2',{exact:true}).first()).toBeVisible();
+  await expect(targetCard.getByText(/You need to order/)).toBeVisible();
+  await expect(targetCard.getByRole('button',{name:/Order my shortage/i})).toBeVisible();
 
   const raceCard=page.locator('.fuel-v3-race-card');
   await expect(raceCard.getByText('Cape Town Test Race')).toBeVisible();
