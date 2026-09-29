@@ -7,7 +7,8 @@ const raceUrl=new URL('../src/RaceApp.jsx',import.meta.url);
 
 test('Race is isolated from the legacy Training page tree',async()=>{
   const shell=await readFile(shellUrl,'utf8');
-  assert.match(shell,/const RaceApp=lazy\(\(\)=>import\('\.\/RaceApp'\)\)/);
+  assert.match(shell,/loadRaceRoute=.*import\('\.\/RaceApp'\)/);
+  assert.match(shell,/const RaceApp=lazy\(loadRaceRoute\)/);
   assert.match(shell,/\{section==='race'&&<RaceApp\/>\}/);
   assert.doesNotMatch(shell,/isTrainingArea&&<TrainingApp/);
 });
