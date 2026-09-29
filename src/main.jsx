@@ -146,8 +146,10 @@ function scheduleOnboarding(){
   if(window.__JF_ONBOARDING_SCHEDULED__)return;
   window.__JF_ONBOARDING_SCHEDULED__=true;
   const start=()=>mountOnboarding().catch(error=>console.warn('Athlete onboarding could not load:',error));
-  if('requestIdleCallback' in window)window.requestIdleCallback(start,{timeout:900});
-  else window.setTimeout(start,350);
+  window.setTimeout(()=>{
+    if('requestIdleCallback' in window)window.requestIdleCallback(start,{timeout:1600});
+    else window.setTimeout(start,250);
+  },5000);
 }
 
 function renderApp(){
@@ -164,15 +166,14 @@ function renderApp(){
 function boot(){
   try{document.cookie='jf_shell_v16=1; Path=/; Max-Age=31536000; SameSite=Lax; Secure'}catch{}
 
-  // Keep first paint lean. Global helpers load only after the shell is visible,
-  // while Training/Race enhancements and onboarding remain deferred.
+  // First paint and signed-in Home data get an uncontested startup window.
   renderApp();
   loadGlobalEnhancements();
   installAppUpdateWatcher();
   scheduleOnboarding();
 
-  // Retire any old service worker after the current shell is already visible.
-  window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},0);
+  // Legacy worker cleanup is maintenance, not startup work.
+  window.setTimeout(()=>{handOffLegacyWorker().catch(()=>{})},6000);
 }
 
 boot();
