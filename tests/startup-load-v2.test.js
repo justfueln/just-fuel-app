@@ -32,3 +32,11 @@ test('onboarding and legacy PWA cleanup are deferred startup maintenance',()=>{
   assert.match(main,/\},5000\);/);
   assert.match(main,/handOffLegacyWorker\(\).*\},6000\)/s);
 });
+
+test('stable vendor libraries are split for stronger browser caching',()=>{
+  const vite=read('vite.config.js');
+  assert.match(vite,/react-vendor/);
+  assert.match(vite,/supabase-vendor/);
+  assert.match(vite,/icons-vendor/);
+  assert.match(vite,/manualChunks/);
+});
