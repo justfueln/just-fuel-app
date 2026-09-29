@@ -1,6 +1,6 @@
 /* Phase 11 training shell, performance-safe mobile variant.
    The outer Today / Plan / Progress navigation is the normal Training nav.
-   Avoid relational :has() selectors and GPU-heavy backdrop filters on the sticky shell. */
+   Avoid relational selectors and GPU-heavy backdrop filters on the sticky shell. */
 .full-shell.training-page .app-shell>.section-nav{display:none!important}
 
 .full-shell.training-page .app-shell>.topbar{position:sticky;top:0;z-index:24;background:#080808}
