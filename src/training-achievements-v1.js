@@ -11,16 +11,25 @@ function fmtShort(v){if(!v)return'';const d=new Date(`${String(v).slice(0,10)}T1
 function valueText(a){if(a?.value_num==null)return'';return `${Math.round(Number(a.value_num))}${a.unit==='W'?' W':a.unit?` ${a.unit}`:''}`}
 function improvementText(a){const now=Number(a?.value_num),before=Number(a?.previous_value_num);if(!Number.isFinite(now)||!Number.isFinite(before)||before<=0)return'';const pct=(now-before)/before*100;return pct>0?`+${pct.toFixed(pct>=10?0:1)}%`:''}
 function typeTone(type){return type==='ftp_improvement'?'ftp':type==='power_pb'?'pb':'sustained'}
+function choosePlan(rows,today){
+  const list=Array.isArray(rows)?rows:[];
+  return list.filter(p=>String(p.start_date||'0000-00-00')<=today&&String(p.race_date||'9999-12-31')>=today)
+    .sort((a,b)=>String(a.race_date||'9999-12-31').localeCompare(String(b.race_date||'9999-12-31'))||String(b.generated_at||'').localeCompare(String(a.generated_at||'')))[0]
+    ||list.filter(p=>String(p.start_date||'9999-12-31')>today).sort((a,b)=>String(a.start_date).localeCompare(String(b.start_date)))[0]
+    ||list[0]
+    ||null;
+}
 
 async function load(force=false){
   if(!force&&cacheAt&&Date.now()-cacheAt<45000)return{achievements,completionRows};
   if(loading)return loading;
   loading=(async()=>{
     const{data:{session}}=await sb.auth.getSession();if(!session?.user)return{achievements:[],completionRows:[]};
-    const uid=session.user.id;
+    const uid=session.user.id,today=new Date().toISOString().slice(0,10);
     // Achievement calculation belongs to Strava/post-sync processing. Rendering this
     // screen must stay read-only so opening Progress cannot trigger a backend rebuild.
-    const{data:plan}=await sb.from('training_plans').select('id').eq('user_id',uid).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle();
+    const{data:plans}=await sb.from('training_plans').select('id,start_date,race_date,generated_at').eq('user_id',uid).eq('status','active').limit(20);
+    const plan=choosePlan(plans,today);
     const since=new Date(Date.now()-90*86400000).toISOString();
     const recentPlanDate=new Date(Date.now()-30*86400000).toISOString().slice(0,10);
     const achievementQuery=sb.from('training_achievements').select('id,achievement_key,achievement_type,title,message,metric_label,value_num,previous_value_num,unit,activity_id,activity_date,source,metadata,seen_at,created_at').eq('user_id',uid).gte('created_at',since).order('created_at',{ascending:false}).limit(30);
