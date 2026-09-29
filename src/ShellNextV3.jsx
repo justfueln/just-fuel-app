@@ -28,6 +28,7 @@ function loadLastBasket(){
   try{const raw=localStorage.getItem(LAST_BASKET_KEY);const items=readSavedItems(raw,LAST_BASKET_TTL);if(raw&&!items.length)localStorage.removeItem(LAST_BASKET_KEY);return items}catch{return[]}
 }
 function resetScroll(){window.scrollTo({top:0,left:0,behavior:'auto'})}
+function historySection(value){const next=normalizeMainSection(value);return next==='training'?'Training':next}
 function RouteLoading(){return <div className="center-screen"><p>Loading…</p></div>}
 
 export default function ShellNextV3(){
@@ -55,7 +56,7 @@ export default function ShellNextV3(){
     applySection(next);
     window.history.pushState({
       ...window.history.state,
-      jfSection:next,
+      jfSection:historySection(next),
       jfTrainingTab:targetTab||window.history.state?.jfTrainingTab,
       jfTrainingView:next==='training'?'today':window.history.state?.jfTrainingView,
       jfTrainingSubView:next==='training'?null:window.history.state?.jfTrainingSubView,
@@ -69,15 +70,15 @@ export default function ShellNextV3(){
   function openTrainingView(value){
     const target=trainingTargetForView(value);
     setTrainingView(target.id);
-    window.history.pushState({...window.history.state,jfSection:'training',jfTrainingTab:target.legacyTab,jfTrainingView:target.id,jfTrainingSubView:target.subView,jfProfile:false,jfBasket:false},'',window.location.href);
-    // AppV3 already owns a popstate listener for its legacy tab state. Dispatch the
-    // new state without remounting the whole Training tree and re-running auth/data.
+    window.history.pushState({...window.history.state,jfSection:historySection('training'),jfTrainingTab:target.legacyTab,jfTrainingView:target.id,jfTrainingSubView:target.subView,jfProfile:false,jfBasket:false},'',window.location.href);
+    // AppV3 owns the legacy Training tab state. Dispatch the new state so it can
+    // fetch/render the selected Training view without requiring a browser refresh.
     window.dispatchEvent(new PopStateEvent('popstate',{state:window.history.state}));
     resetScroll();
   }
-  function openProfile(){if(profileOpen)return;setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:section,jfProfile:true,jfBasket:false},'',window.location.href);resetScroll()}
+  function openProfile(){if(profileOpen)return;setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:historySection(section),jfProfile:true,jfBasket:false},'',window.location.href);resetScroll()}
   function closeProfile(){if(window.history.state?.jfProfile)window.history.back();else setProfileOpen(false)}
-  function openBasket(){if(basketOpen)return;setProfileOpen(false);setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfTrainingView:trainingView,jfFuelView:fuelView,jfProfile:false,jfBasket:true},'',window.location.href)}
+  function openBasket(){if(basketOpen)return;setProfileOpen(false);setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:historySection(section),jfTrainingView:trainingView,jfFuelView:fuelView,jfProfile:false,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
   function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
@@ -99,7 +100,7 @@ export default function ShellNextV3(){
     const initialFuelView=section==='fuel'?normalizeFuelView(window.history.state?.jfFuelView):fuelView;
     if(section==='training')setTrainingView(initialTrainingView);
     if(section==='fuel')setFuelView(initialFuelView);
-    window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:section==='training'?target.legacyTab:(targetTab||window.history.state?.jfTrainingTab),jfTrainingView:section==='training'?initialTrainingView:window.history.state?.jfTrainingView,jfTrainingSubView:section==='training'?target.subView:window.history.state?.jfTrainingSubView,jfFuelView:section==='fuel'?initialFuelView:window.history.state?.jfFuelView,jfHomeView:'index',jfProfile:Boolean(window.history.state?.jfProfile),jfBasket:false},'',nextUrl);
+    window.history.replaceState({...window.history.state,jfSection:historySection(section),jfTrainingTab:section==='training'?target.legacyTab:(targetTab||window.history.state?.jfTrainingTab),jfTrainingView:section==='training'?initialTrainingView:window.history.state?.jfTrainingView,jfTrainingSubView:section==='training'?target.subView:window.history.state?.jfTrainingSubView,jfFuelView:section==='fuel'?initialFuelView:window.history.state?.jfFuelView,jfHomeView:'index',jfProfile:Boolean(window.history.state?.jfProfile),jfBasket:false},'',nextUrl);
     const onPop=e=>{
       const next=normalizeMainSection(e.state?.jfSection||'home');
       setSectionState(next);setTrainingView(trainingViewFromState(e.state||{}));setFuelView(normalizeFuelView(e.state?.jfFuelView));setProfileOpen(Boolean(e.state?.jfProfile));setBasketOpen(Boolean(e.state?.jfBasket));
