@@ -1,10 +1,9 @@
-/* Phase 11 removes the old post-render navigation patcher from normal Training views.
-   The outer Today / Plan / Progress navigation is now the single visible Training nav.
-   Legacy internal tabs remain available only when a setup action explicitly opens one. */
+/* Phase 11 training shell, performance-safe mobile variant.
+   The outer Today / Plan / Progress navigation is the normal Training nav.
+   Avoid relational :has() selectors and GPU-heavy backdrop filters on the sticky shell. */
 .full-shell.training-page .app-shell>.section-nav{display:none!important}
-.full-shell.training-page .app-shell>.section-nav:has(button:nth-child(n+4).active){display:grid!important}
 
-.full-shell.training-page .app-shell>.topbar{position:sticky;top:0;z-index:24;background:rgba(8,8,8,.96);backdrop-filter:blur(14px)}
+.full-shell.training-page .app-shell>.topbar{position:sticky;top:0;z-index:24;background:#080808}
 .full-shell.training-page .app-shell>main{padding-top:14px}
 .full-shell.training-page .next-session{border-color:var(--jf-border-gold);background:linear-gradient(180deg,rgba(220,179,75,.055),rgba(17,17,15,.98))}
 .full-shell.training-page .next-session .card-title{color:var(--jf-gold)}
@@ -19,12 +18,12 @@
 .full-shell.training-page .app-shell .jf-profile-button{display:none!important}
 .full-shell.training-page .app-shell .jf-back-overview{display:none!important}
 
-/* Keep the existing Workout Details + Garmin enhancement visually native while its data flow is preserved. */
+/* Keep Workout Details + Garmin visually native while its data flow is preserved. */
 .full-shell.training-page .workout-details-wrap{border-top:1px solid var(--jf-border);padding-top:12px;margin-top:14px}
 .full-shell.training-page .workout-details-toggle{width:100%;min-height:46px;border:1px solid var(--jf-border-gold);border-radius:var(--jf-radius-sm);background:var(--jf-gold-soft);color:var(--jf-text);font-weight:800}
 .full-shell.training-page .workout-details-body{margin-top:12px}
 
 @media(max-width:620px){
   .full-shell.training-page .app-shell>main{padding-top:10px}
-  .full-shell.training-page .app-shell>.section-nav:has(button:nth-child(n+4).active){grid-auto-columns:minmax(82px,1fr)}
+  .full-shell.training-page .next-session{background:#11110f}
 }
