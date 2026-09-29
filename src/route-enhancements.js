@@ -1,10 +1,16 @@
 const loaded={global:false,training:false,race:false};
+let smartCoachPromise=null;
 
 function idle(task,timeout=1200){
   const run=()=>Promise.resolve().then(task).catch(error=>console.warn('Deferred Just Fuel enhancement failed:',error));
   if(typeof window==='undefined')return;
   if('requestIdleCallback'in window)window.requestIdleCallback(run,{timeout});
   else window.setTimeout(run,180);
+}
+
+function ensureSmartCoach(){
+  if(!smartCoachPromise)smartCoachPromise=import('./smart-coach-v2').catch(error=>{smartCoachPromise=null;throw error});
+  return smartCoachPromise;
 }
 
 export function loadGlobalEnhancements(){
@@ -15,9 +21,14 @@ export function loadGlobalEnhancements(){
 
 export function loadEnhancementsForSection(section){
   if(typeof window==='undefined')return;
+
+  // Home stays first-paint focused: coaching polish loads only once the browser is idle.
+  if(section==='home')idle(()=>ensureSmartCoach(),900);
+
   if(section==='training'&&!loaded.training){
     loaded.training=true;
     Promise.all([
+      ensureSmartCoach(),
       import('./training-simple-flow-v4'),
       import('./training-workout-details'),
       import('./training-multisport-targets-v1'),
@@ -36,6 +47,8 @@ export function loadEnhancementsForSection(section){
       import('./training-power-curve-v1'),
       import('./training-achievements-v1')
     ]),1000);
+  }else if(section==='training'){
+    ensureSmartCoach().catch(error=>console.warn('Smart Coach load failed:',error));
   }
 
   if(section==='race'&&!loaded.race){
@@ -50,4 +63,4 @@ export function loadEnhancementsForSection(section){
   }
 }
 
-export function enhancementLoadState(){return{...loaded}}
+export function enhancementLoadState(){return{...loaded,smartCoach:Boolean(smartCoachPromise)}}
