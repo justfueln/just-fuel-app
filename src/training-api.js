@@ -40,6 +40,25 @@ function localDateKey(){
   return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
 }
 
+function dateKey(value,fallback='9999-12-31'){return value?String(value).slice(0,10):fallback}
+function newestFirst(a,b){return String(b.generated_at||'').localeCompare(String(a.generated_at||''))}
+function chooseCurrentPlan(rows,today=localDateKey()){
+  const plans=Array.isArray(rows)?rows:[];
+  const current=plans.filter(p=>dateKey(p.start_date)<=today&&dateKey(p.race_date)>=today).sort((a,b)=>dateKey(a.race_date).localeCompare(dateKey(b.race_date))||newestFirst(a,b));
+  if(current.length)return current[0];
+  const future=plans.filter(p=>dateKey(p.start_date)>today).sort((a,b)=>dateKey(a.start_date).localeCompare(dateKey(b.start_date))||newestFirst(a,b));
+  if(future.length)return future[0];
+  return plans.slice().sort((a,b)=>dateKey(b.race_date,'0000-00-00').localeCompare(dateKey(a.race_date,'0000-00-00'))||newestFirst(a,b))[0]||null;
+}
+
+async function fetchCurrentPlan(client,userId){
+  const result=await safePostgrest(
+    client.from('training_plans').select('id,start_date,race_date,generated_at').eq('user_id',userId).eq('status','active').limit(20),
+    1200
+  );
+  return{plan:result.error?null:chooseCurrentPlan(result.data),error:result.error||null};
+}
+
 function normalizeDashboard(value){return Array.isArray(value)?value[0]||{}:value||{}}
 
 function dashboardToTrainingHome(value){
@@ -130,12 +149,9 @@ export async function applyMorningReadinessAdjustment(client,today,accept){
 }
 
 export async function fetchTrainingPlan(client,userId){
-  const active=await safePostgrest(
-    client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle(),
-    1000
-  );
+  const active=await fetchCurrentPlan(client,userId);
   if(active.error)return{plan:[],error:active.error};
-  const activePlanId=active.data?.id;
+  const activePlanId=active.plan?.id;
   if(!activePlanId)return{plan:[],error:null};
 
   const fields='id,plan_id,week_id,user_id,race_goal_id,session_date,sport_type,session_type,title,phase,intensity_zone,planned_duration_minutes,duration_minutes,target_load,target_power_low_w,target_power_high_w,target_distance_km,target_elevation_m,is_key_session,priority,instructions,status,week_number,week_start,week_focus,is_recovery,adaptation_factor,adaptation_reason,event_name,event_date,actual_activity_id,actual_strava_activity_id,actual_start_date_local,actual_name,actual_duration_minutes,actual_distance_km,actual_elevation_m,actual_avg_hr,actual_weighted_watts,actual_training_load,match_score,duration_completion_pct,load_completion_pct,progression_status,progression_factor,progression_reason,progression_source_count,progression_applied_at,target_metric,target_hr_low,target_hr_high,target_pace_fast_sec_per_km,target_pace_slow_sec_per_km,target_rpe_low,target_rpe_high,target_metric_note';
@@ -148,9 +164,9 @@ export async function fetchTrainingPlan(client,userId){
 }
 
 export async function fetchFuelTrainingPlan(client,userId){
-  const active=await safePostgrest(client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle(),1000);
+  const active=await fetchCurrentPlan(client,userId);
   if(active.error)return{plan:[],error:active.error};
-  const activePlanId=active.data?.id;
+  const activePlanId=active.plan?.id;
   if(!activePlanId)return{plan:[],error:null};
   const todayKey=localDateKey();
   const query=client.from('training_session_fuel_plan_multisport')
@@ -190,8 +206,6 @@ export async function fetchTrainingFuelForecast(client,userId){
 
 export async function fetchTrainingHistory(client,userId){
   const fields='id,strava_activity_id,name,sport_type,activity_type,start_date,start_date_local,distance_m,moving_time_s,elapsed_time_s,total_elevation_gain_m,effective_average_heartrate,effective_max_heartrate,effective_average_cadence,effective_average_watts,effective_weighted_average_watts,effective_kilojoules,effective_calories,trainer,manual,had_duplicate,duplicate_confidence,synced_at,estimated_training_load,load_source,load_confidence,sport_family';
-  // Initial Progress rendering only needs recent training. Keeping this request bounded
-  // prevents large Strava histories from locking the UI while preserving 6-month trends.
   const result=await safePostgrest(
     client.from('training_activity_metrics').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).limit(250),
     2200
@@ -243,9 +257,6 @@ export async function verifyTrainingOtp(client,email,token){
 
 export async function syncTrainingStrava(client){
   const result=await client.functions.invoke('strava-sync',{body:{}});
-  // The deployed sync function already performs matching, adaptation, progression and
-  // target refreshes. Only run the legacy browser refresh chain if the backend
-  // explicitly asks for it; otherwise it duplicates expensive work and can time out.
   if(!result.error&&result.data?.client_refresh_required===true){
     try{
       const auth=await client.auth.getSession();
