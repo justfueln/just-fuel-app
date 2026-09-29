@@ -1,0 +1,1 @@
+Production database hotfix applied 2026-09-29. See docs/dashboard-timeout-hotfix.md and scripts/hotfix-fast-today-dashboard.sql.
