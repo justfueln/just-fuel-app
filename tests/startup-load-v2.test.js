@@ -12,7 +12,9 @@ test('startup API calls are deduplicated and time-bounded',()=>{
   assert.match(api,/cachedRequest\(`today-dashboard:/);
   assert.match(api,/cachedRequest\(`today-readiness:/);
   assert.match(api,/cachedRequest\(`fuel-forecast:/);
-  assert.match(api,/runPostgrest\(client\.rpc\('get_today_dashboard'/);
+  assert.match(api,/safePostgrest\(client\.rpc\('get_today_dashboard'/);
+  assert.match(api,/async function safePostgrest/);
+  assert.match(api,/runPostgrest\(builder,timeoutMs\)/);
   assert.match(api,/1800\)/);
   assert.match(api,/1200\)/);
   assert.match(api,/3500\)/);

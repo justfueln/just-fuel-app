@@ -26,17 +26,60 @@ async function runPostgrest(builder,timeoutMs){
   try{return await builder.abortSignal(controller.signal)}finally{clearTimeout(timer)}
 }
 
+function requestError(error,fallback='Request timed out. Please try again.'){
+  if(error?.message)return error;
+  return{message:fallback};
+}
+
+async function safePostgrest(builder,timeoutMs){
+  try{return await runPostgrest(builder,timeoutMs)}catch(error){return{data:null,error:requestError(error)}}
+}
+
+function localDateKey(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+
+function normalizeDashboard(value){return Array.isArray(value)?value[0]||{}:value||{}}
+
+function dashboardToTrainingHome(value){
+  const dashboard=normalizeDashboard(value);
+  const next=dashboard.next_session||{};
+  const week=dashboard.week||{};
+  const race=dashboard.next_race||{};
+  const planned=Number(week.planned_sessions)||0;
+  const completed=Number(week.completed_sessions)||0;
+  return{
+    next_session_id:next.id||null,
+    next_session_date:next.date||null,
+    next_session_title:next.title||null,
+    next_session_type:next.type||null,
+    next_session_duration_minutes:next.duration_minutes??null,
+    next_session_carb_target_gph:next.carbs_gph??null,
+    next_session_bottle_mix:next.bottle_mix??null,
+    next_session_regular_gels:next.regular_gels??null,
+    next_session_boost_gels:next.boost_gels??null,
+    next_session_recover:next.recover??null,
+    event_name:race.name||null,
+    event_date:race.date||null,
+    days_to_race:race.days_to_race??null,
+    week_completion_pct:planned>0?Math.round((completed/planned)*100):null
+  };
+}
+
 export async function fetchTrainingCore(client,userId){
-  const[setup,home]=await Promise.all([
-    client.from('training_setup_status').select('*').eq('user_id',userId).maybeSingle(),
-    client.from('training_home_summary').select('*').eq('user_id',userId).maybeSingle()
-  ]);
-  return{setup:setup.data||null,home:home.data||null,error:setup.error||home.error||null};
+  const today=localDateKey();
+  return cachedRequest(`training-core:${userId}:${today}`,2500,async()=>{
+    const result=await safePostgrest(client.rpc('get_training_core_fast',{p_today:today}),1800);
+    if(result.error)return{setup:null,home:null,error:result.error};
+    const payload=result.data||{};
+    return{setup:payload.setup||null,home:dashboardToTrainingHome(payload.dashboard),error:null};
+  });
 }
 
 export async function fetchTodayDashboard(client,today){
   return cachedRequest(`today-dashboard:${today}`,2500,async()=>{
-    const result=await runPostgrest(client.rpc('get_today_dashboard',{p_today:today}),1800);
+    const result=await safePostgrest(client.rpc('get_today_dashboard',{p_today:today}),1800);
     return{dashboard:result.data||{},error:result.error||null};
   });
 }
@@ -48,7 +91,7 @@ export async function fetchTodayReadiness(client,userId,today){
       .eq('user_id',userId)
       .eq('checkin_date',today)
       .maybeSingle();
-    const result=await runPostgrest(query,1200);
+    const result=await safePostgrest(query,1200);
     return{readiness:result.data||null,error:result.error||null};
   });
 }
@@ -66,6 +109,7 @@ export async function saveMorningReadiness(client,today,values){
   if(result.error)return{readiness:null,error:result.error};
   clearRequestCache('today-readiness:');
   clearRequestCache('today-dashboard:');
+  clearRequestCache('training-core:');
   const auth=await client.auth.getSession();
   const uid=auth.data.session?.user?.id;
   let adaptation=null,progression=null;
@@ -80,57 +124,66 @@ export async function applyMorningReadinessAdjustment(client,today,accept){
   const result=await client.rpc('apply_training_readiness_adjustment',{p_today:today,p_accept:Boolean(accept)});
   clearRequestCache('today-dashboard:');
   clearRequestCache('today-readiness:');
+  clearRequestCache('training-core:');
   clearRequestCache('fuel-forecast:');
   return{result:result.data||null,error:result.error||null};
 }
 
 export async function fetchTrainingPlan(client,userId){
-  const[calendar,active]=await Promise.all([
-    client.from('training_plan_calendar_with_fuel').select('*').eq('user_id',userId).order('session_date',{ascending:true}),
-    client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle()
-  ]);
-  const error=calendar.error||active.error||null;
-  const activePlanId=active.data?.id;
-  return{plan:error?[]:activePlanId?(calendar.data||[]).filter(x=>x.plan_id===activePlanId):[],error};
-}
-
-export async function fetchFuelTrainingPlan(client,userId){
-  const active=await client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle();
+  const active=await safePostgrest(
+    client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle(),
+    1000
+  );
   if(active.error)return{plan:[],error:active.error};
   const activePlanId=active.data?.id;
   if(!activePlanId)return{plan:[],error:null};
-  const today=new Date(),p=n=>String(n).padStart(2,'0');
-  const todayKey=`${today.getFullYear()}-${p(today.getMonth()+1)}-${p(today.getDate())}`;
-  const result=await client.from('training_session_fuel_plan_multisport')
+
+  const fields='id,plan_id,week_id,user_id,race_goal_id,session_date,sport_type,session_type,title,phase,intensity_zone,planned_duration_minutes,duration_minutes,target_load,target_power_low_w,target_power_high_w,target_distance_km,target_elevation_m,is_key_session,priority,instructions,status,week_number,week_start,week_focus,is_recovery,adaptation_factor,adaptation_reason,event_name,event_date,actual_activity_id,actual_strava_activity_id,actual_start_date_local,actual_name,actual_duration_minutes,actual_distance_km,actual_elevation_m,actual_avg_hr,actual_weighted_watts,actual_training_load,match_score,duration_completion_pct,load_completion_pct,progression_status,progression_factor,progression_reason,progression_source_count,progression_applied_at,target_metric,target_hr_low,target_hr_high,target_pace_fast_sec_per_km,target_pace_slow_sec_per_km,target_rpe_low,target_rpe_high,target_metric_note';
+  const calendar=await safePostgrest(
+    client.from('training_plan_calendar').select(fields).eq('user_id',userId).eq('plan_id',activePlanId).order('session_date',{ascending:true}),
+    1800
+  );
+  if(calendar.error)return{plan:[],error:calendar.error};
+  return{plan:calendar.data||[],error:null};
+}
+
+export async function fetchFuelTrainingPlan(client,userId){
+  const active=await safePostgrest(client.from('training_plans').select('id').eq('user_id',userId).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle(),1000);
+  if(active.error)return{plan:[],error:active.error};
+  const activePlanId=active.data?.id;
+  if(!activePlanId)return{plan:[],error:null};
+  const todayKey=localDateKey();
+  const query=client.from('training_session_fuel_plan_multisport')
     .select('session_id,plan_id,session_date,sport_type,title,duration_minutes,status,carb_target_gph,bottle_mix_sachets,regular_gels,boost_gels,hydrate_servings,recover_servings,hydration_ml_per_hour,hydration_ml_total,sodium_target_mg_per_hour,sodium_target_mg_total,fuel_delivery_mode,fueling_note,boost_note,recovery_note,hydration_note')
     .eq('user_id',userId)
     .eq('plan_id',activePlanId)
     .gte('session_date',todayKey)
     .order('session_date',{ascending:true});
+  const result=await safePostgrest(query,2500);
   return{plan:result.error?[]:(result.data||[]).map(row=>({...row,id:row.session_id})),error:result.error||null};
 }
 
 export async function fetchTrainingRaces(client,userId){
-  const result=await client.from('athlete_season_events').select('*').eq('user_id',userId).order('event_date',{ascending:true});
+  const result=await safePostgrest(client.from('athlete_season_events').select('*').eq('user_id',userId).order('event_date',{ascending:true}),1800);
   return{races:result.data||[],error:result.error||null};
 }
 
 export async function fetchTrainingProfile(client,userId){
-  const result=await client.from('training_profiles').select('*').eq('user_id',userId).maybeSingle();
+  const result=await safePostgrest(client.from('training_profiles').select('*').eq('user_id',userId).maybeSingle(),1500);
   return{profile:result.data||null,error:result.error||null};
 }
 
 export async function fetchTrainingFuelBase(client,userId){
   const[stock,profile]=await Promise.all([
-    client.from('fuel_inventory').select('*').eq('user_id',userId),
-    client.from('training_fueling_profiles').select('*').eq('user_id',userId).maybeSingle()
+    safePostgrest(client.from('fuel_inventory').select('*').eq('user_id',userId),1500),
+    safePostgrest(client.from('training_fueling_profiles').select('*').eq('user_id',userId).maybeSingle(),1500)
   ]);
   return{stock:stock.data||[],fuelProfile:profile.data||null,error:stock.error||profile.error||null};
 }
 
 export async function fetchTrainingFuelForecast(client,userId){
   return cachedRequest(`fuel-forecast:${userId}`,5000,async()=>{
-    const result=await runPostgrest(client.rpc('get_training_fuel_forecast',{p_user_id:userId}),3500);
+    const result=await safePostgrest(client.rpc('get_training_fuel_forecast',{p_user_id:userId}),3500);
     return{fuel:result.data||[],error:result.error||null};
   });
 }
@@ -141,7 +194,7 @@ export async function fetchTrainingHistory(client,userId){
   const seen=new Set();
   const pageSize=500;
   for(let from=0;;from+=pageSize){
-    const result=await client.from('training_activity_metrics').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).range(from,from+pageSize-1);
+    const result=await safePostgrest(client.from('training_activity_metrics').select(fields).eq('user_id',userId).order('start_date_local',{ascending:false}).range(from,from+pageSize-1),2500);
     if(result.error)return{history:[],error:result.error};
     const page=result.data||[];
     for(const row of page){
@@ -215,6 +268,7 @@ export async function syncTrainingStrava(client){
   }
   clearRequestCache('today-dashboard:');
   clearRequestCache('today-readiness:');
+  clearRequestCache('training-core:');
   clearRequestCache('fuel-forecast:');
   if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('jf-strava-synced',{detail:result?.data||null}));
   return result;
