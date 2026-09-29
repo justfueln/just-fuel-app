@@ -52,8 +52,6 @@ import './race-fuel-rehearsal-v1.css';
 
 const CURRENT_APP_VERSION='16';
 const PWA_CLEAN_KEY=`jf-pwa-clean-v${CURRENT_APP_VERSION}`;
-let onboardingScheduled=false;
-let onboardingRoot=null;
 
 export const supabase = createClient(
   'https://ufolqntrfmvefpvrjnsa.supabase.co',
@@ -130,7 +128,7 @@ async function handOffLegacyWorker(){
 }
 
 async function mountOnboarding(){
-  if(onboardingRoot)return;
+  if(window.__JF_ONBOARDING_ROOT__)return;
   let host=document.getElementById('jf-onboarding-root');
   if(!host){
     host=document.createElement('div');
@@ -138,14 +136,15 @@ async function mountOnboarding(){
     document.body.appendChild(host);
   }
   const{default:AthleteOnboardingGate}=await import('./AthleteOnboardingGate');
-  if(onboardingRoot)return;
-  onboardingRoot=ReactDOM.createRoot(host);
-  onboardingRoot.render(<ErrorBoundary><AthleteOnboardingGate/></ErrorBoundary>);
+  if(window.__JF_ONBOARDING_ROOT__)return;
+  const root=ReactDOM.createRoot(host);
+  window.__JF_ONBOARDING_ROOT__=root;
+  root.render(<ErrorBoundary><AthleteOnboardingGate/></ErrorBoundary>);
 }
 
 function scheduleOnboarding(){
-  if(onboardingScheduled)return;
-  onboardingScheduled=true;
+  if(window.__JF_ONBOARDING_SCHEDULED__)return;
+  window.__JF_ONBOARDING_SCHEDULED__=true;
   const start=()=>mountOnboarding().catch(error=>console.warn('Athlete onboarding could not load:',error));
   if('requestIdleCallback' in window)window.requestIdleCallback(start,{timeout:900});
   else window.setTimeout(start,350);
