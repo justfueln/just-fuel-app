@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowLeft, Flag, Fuel, Home, ShoppingBag, Store, UserRound } from 'lucide-react';
+import { Activity, Flag, Fuel, Home, ShoppingBag, Store, UserRound } from 'lucide-react';
 import { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
 import HomeIndex from './HomeIndex';
@@ -13,9 +13,7 @@ const RaceApp=lazy(()=>import('./RaceApp'));
 const CheckoutDrawer=lazy(()=>import('./CheckoutDrawer'));
 const FuelHubV2=lazy(()=>import('./FuelHubV2'));
 const ProfileHub=lazy(()=>import('./ProfileHub'));
-const FuelBuilder=lazy(()=>import('./CommercePages').then(mod=>({default:mod.FuelBuilder})));
 const ShopPage=lazy(()=>import('./CommercePages').then(mod=>({default:mod.ShopPage})));
-const LearnPage=lazy(()=>import('./CommercePages').then(mod=>({default:mod.LearnPage})));
 
 const NAV_ICONS={home:Home,training:Activity,race:Flag,fuel:Fuel,shop:Store};
 const BASKET_KEY = 'just-fuel-basket-v3';
@@ -34,7 +32,6 @@ function RouteLoading(){return <div className="center-screen"><p>Loading…</p><
 
 export default function ShellNextV3(){
   const [section,setSectionState]=useState(()=>resolveInitialMainSection({historyState:window.history.state,search:window.location.search,pathname:window.location.pathname}));
-  const [homeView,setHomeView]=useState(()=>window.history.state?.jfHomeView||'index');
   const [trainingView,setTrainingView]=useState(()=>trainingViewFromState(window.history.state||{}));
   const [fuelView,setFuelView]=useState(()=>normalizeFuelView(window.history.state?.jfFuelView));
   const [profileOpen,setProfileOpen]=useState(()=>Boolean(window.history.state?.jfProfile));
@@ -53,7 +50,6 @@ export default function ShellNextV3(){
     const targetTab=trainingTabForRoute(next);
     const nextFuelView=next==='fuel'?normalizeFuelView(options.fuelView||'home'):fuelView;
     setBasketOpen(false);setProfileOpen(false);
-    if(next==='home')setHomeView('index');
     if(next==='training')setTrainingView('today');
     if(next==='fuel')setFuelView(nextFuelView);
     applySection(next);
@@ -64,7 +60,7 @@ export default function ShellNextV3(){
       jfTrainingView:next==='training'?'today':window.history.state?.jfTrainingView,
       jfTrainingSubView:next==='training'?null:window.history.state?.jfTrainingSubView,
       jfFuelView:next==='fuel'?nextFuelView:window.history.state?.jfFuelView,
-      jfHomeView:next==='home'?'index':window.history.state?.jfHomeView,
+      jfHomeView:'index',
       jfProfile:false,
       jfBasket:false
     },'',window.location.href);
@@ -76,15 +72,9 @@ export default function ShellNextV3(){
     window.history.pushState({...window.history.state,jfSection:'training',jfTrainingTab:target.legacyTab,jfTrainingView:target.id,jfTrainingSubView:target.subView,jfProfile:false,jfBasket:false},'',window.location.href);
     resetScroll();
   }
-  function openHomeView(value){
-    const next=value||'index';
-    setHomeView(next);
-    window.history.pushState({...window.history.state,jfSection:'home',jfHomeView:next,jfProfile:false,jfBasket:false},'',window.location.href);
-    resetScroll();
-  }
   function openProfile(){if(profileOpen)return;setBasketOpen(false);setProfileOpen(true);window.history.pushState({...window.history.state,jfSection:section,jfProfile:true,jfBasket:false},'',window.location.href);resetScroll()}
   function closeProfile(){if(window.history.state?.jfProfile)window.history.back();else setProfileOpen(false)}
-  function openBasket(){if(basketOpen)return;setProfileOpen(false);setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfHomeView:homeView,jfTrainingView:trainingView,jfFuelView:fuelView,jfProfile:false,jfBasket:true},'',window.location.href)}
+  function openBasket(){if(basketOpen)return;setProfileOpen(false);setBasketOpen(true);if(!window.history.state?.jfBasket)window.history.pushState({...window.history.state,jfSection:section,jfTrainingView:trainingView,jfFuelView:fuelView,jfProfile:false,jfBasket:true},'',window.location.href)}
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
   function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
@@ -106,10 +96,10 @@ export default function ShellNextV3(){
     const initialFuelView=section==='fuel'?normalizeFuelView(window.history.state?.jfFuelView):fuelView;
     if(section==='training')setTrainingView(initialTrainingView);
     if(section==='fuel')setFuelView(initialFuelView);
-    window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:section==='training'?target.legacyTab:(targetTab||window.history.state?.jfTrainingTab),jfTrainingView:section==='training'?initialTrainingView:window.history.state?.jfTrainingView,jfTrainingSubView:section==='training'?target.subView:window.history.state?.jfTrainingSubView,jfFuelView:section==='fuel'?initialFuelView:window.history.state?.jfFuelView,jfHomeView:section==='home'?(window.history.state?.jfHomeView||homeView):window.history.state?.jfHomeView,jfProfile:Boolean(window.history.state?.jfProfile),jfBasket:false},'',nextUrl);
+    window.history.replaceState({...window.history.state,jfSection:section,jfTrainingTab:section==='training'?target.legacyTab:(targetTab||window.history.state?.jfTrainingTab),jfTrainingView:section==='training'?initialTrainingView:window.history.state?.jfTrainingView,jfTrainingSubView:section==='training'?target.subView:window.history.state?.jfTrainingSubView,jfFuelView:section==='fuel'?initialFuelView:window.history.state?.jfFuelView,jfHomeView:'index',jfProfile:Boolean(window.history.state?.jfProfile),jfBasket:false},'',nextUrl);
     const onPop=e=>{
       const next=normalizeMainSection(e.state?.jfSection||'home');
-      setSectionState(next);setHomeView(e.state?.jfHomeView||'index');setTrainingView(trainingViewFromState(e.state||{}));setFuelView(normalizeFuelView(e.state?.jfFuelView));setProfileOpen(Boolean(e.state?.jfProfile));setBasketOpen(Boolean(e.state?.jfBasket));
+      setSectionState(next);setTrainingView(trainingViewFromState(e.state||{}));setFuelView(normalizeFuelView(e.state?.jfFuelView));setProfileOpen(Boolean(e.state?.jfProfile));setBasketOpen(Boolean(e.state?.jfBasket));
       if(!e.state?.jfBasket)requestAnimationFrame(resetScroll);
     };
     window.addEventListener('popstate',onPop);return()=>window.removeEventListener('popstate',onPop);
@@ -123,7 +113,7 @@ export default function ShellNextV3(){
     if(sessionStorage.getItem('jf-open-basket-after-reload')==='1'){sessionStorage.removeItem('jf-open-basket-after-reload');open()}
     window.addEventListener('jf-basket-updated',syncBasket);window.addEventListener('jf-open-basket',open);
     return()=>{window.removeEventListener('jf-basket-updated',syncBasket);window.removeEventListener('jf-open-basket',open)};
-  },[section,basketOpen,homeView,trainingView,fuelView,profileOpen]);
+  },[section,basketOpen,trainingView,fuelView,profileOpen]);
 
   useEffect(()=>{
     const standalone=window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone===true;setInstalled(Boolean(standalone));
@@ -151,10 +141,7 @@ export default function ShellNextV3(){
     <div className="shell-content">
       <Suspense fallback={<RouteLoading/>}>
         {profileOpen?<ProfileHub onClose={closeProfile} reminder={reminder} setReminder={setReminder} requestReminderPermission={requestReminderPermission} installed={installed} installPrompt={installPrompt} installApp={installApp}/>:<>
-          {section==='home'&&homeView==='index'&&<HomeIndex goRoute={setSection} openHomeView={openHomeView}/>} 
-          {section==='home'&&homeView!=='index'&&<HomeSubpageHead title={homeView==='plan'?'Quick Fuel Planner':homeView==='learn'?'Learn':'Settings & Reminders'} onBack={()=>window.history.back()}/>} 
-          {section==='home'&&homeView==='plan'&&<FuelBuilder addLine={addLine} openBasket={openBasket}/>} 
-          {section==='home'&&homeView==='learn'&&<LearnPage/>}
+          {section==='home'&&<HomeIndex goRoute={setSection}/>} 
           {section==='shop'&&<ShopPage addLine={addLine} openBasket={openBasket}/>} 
           {section==='training'&&<TrainingPhaseNav value={trainingView} onChange={openTrainingView}/>} 
           {section==='fuel'&&<FuelHubV2 addLine={addLine} openBasket={openBasket} viewTarget={fuelView} onViewChange={setFuelView}/>} 
@@ -175,4 +162,3 @@ function TrainingPhaseNav({value,onChange}){
   </nav>
 }
 function CurrentAppHeader({count,onBasket,onProfile,profileOpen}){return <header className="current-app-header"><div><div className="current-brand">JUST FUEL</div><div className="current-subbrand">FUEL SMART • TRAIN HARD</div></div><div className="current-header-actions"><button className={`current-profile-button ${profileOpen?'active':''}`} onClick={onProfile} aria-label="Profile and settings"><UserRound size={22}/></button><button className="current-bag-button" onClick={onBasket} aria-label="Open basket"><ShoppingBag size={24}/>{count>0&&<span>{count}</span>}</button></div></header>}
-function HomeSubpageHead({title,onBack}){return <div className="home-subpage-head"><button onClick={onBack} aria-label="Back to Home"><ArrowLeft size={20}/></button><div><span>HOME</span><strong>{title}</strong></div></div>}

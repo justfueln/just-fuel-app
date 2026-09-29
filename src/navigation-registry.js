@@ -35,7 +35,7 @@ export const FUEL_NAV=[
   {id:'stock',label:'Update Stock',copy:'Tell Just Fuel what you already have.',requiresLogin:true,group:'primary'},
   {id:'planner',label:'Quick Fuel Planner',copy:'Build a fuel plan for any standalone session.',group:'utility'},
   {id:'review',label:'Fuel Review',copy:'Compare planned intake with what you actually consumed.',requiresLogin:true,group:'utility'},
-  {id:'order',label:'Order Shortage',copy:'See only what you are short for 7, 14 or 30 days.',requiresLogin:true,group:'contextual'}
+  {id:'order',label:'Order Shortage',copy:'See only what you are short for the next 7 days.',requiresLogin:true,group:'contextual'}
 ];
 
 export function normalizeFuelView(value){

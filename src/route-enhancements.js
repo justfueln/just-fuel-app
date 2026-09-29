@@ -1,3 +1,6 @@
+import './ui-foundation-v11.css';
+import './training-native-v11.css';
+
 const loaded={global:false,training:false,race:false};
 let smartCoachPromise=null;
 
@@ -29,7 +32,8 @@ export function loadEnhancementsForSection(section){
     loaded.training=true;
     Promise.all([
       ensureSmartCoach(),
-      import('./training-simple-flow-v4'),
+      // Phase 11: the outer React shell now owns Today / Plan / Progress navigation.
+      // Do not load training-simple-flow-v4: it renamed/hid/inserted controls after render.
       import('./training-workout-details'),
       import('./training-multisport-targets-v1'),
       import('./training-feedback')
