@@ -12,7 +12,6 @@ const RaceApp=lazy(()=>import('./RaceApp'));
 const CheckoutDrawer=lazy(()=>import('./CheckoutDrawer'));
 const FuelHubV2=lazy(()=>import('./FuelHubV2'));
 const ProfileHub=lazy(()=>import('./ProfileHub'));
-const AthleteOnboardingGate=lazy(()=>import('./AthleteOnboardingGate'));
 const FuelBuilder=lazy(()=>import('./CommercePages').then(mod=>({default:mod.FuelBuilder})));
 const ShopPage=lazy(()=>import('./CommercePages').then(mod=>({default:mod.ShopPage})));
 const LearnPage=lazy(()=>import('./CommercePages').then(mod=>({default:mod.LearnPage})));
@@ -159,7 +158,6 @@ export default function ShellNextV3(){
 
     {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>}
     {basketOpen&&<Suspense fallback={null}><CheckoutDrawer open close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/></Suspense>}
-    <Suspense fallback={null}><AthleteOnboardingGate/></Suspense>
   </div>;
 }
 
