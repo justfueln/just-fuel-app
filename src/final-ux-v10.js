@@ -1,6 +1,5 @@
 import './final-ux-v10.css';
 
-let observer=null;
 let lastSection='';
 let queued=false;
 
@@ -67,11 +66,13 @@ function schedule(){
 
 function start(){
   apply();
-  if(observer)return;
-  observer=new MutationObserver(schedule);
-  observer.observe(document.body,{subtree:true,childList:true});
+  // Event-driven updates avoid observing every subtree mutation in the app.
   document.addEventListener('click',schedule,{passive:true});
+  document.addEventListener('focusin',schedule,{passive:true});
   window.addEventListener('popstate',schedule);
+  window.addEventListener('pageshow',schedule);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')schedule()});
+  ['jf-basket-updated','jf-training-plan-updated','jf-readiness-saved','jf-smart-alerts-refresh','jf-strava-synced'].forEach(name=>window.addEventListener(name,schedule));
 }
 
 if(typeof window!=='undefined'){
