@@ -152,9 +152,9 @@ function scheduleOnboarding(){
   window.__JF_ONBOARDING_SCHEDULED__=true;
   const start=()=>mountOnboarding().catch(error=>console.warn('Athlete onboarding could not load:',error));
   window.setTimeout(()=>{
-    if('requestIdleCallback' in window)window.requestIdleCallback(start,{timeout:1600});
-    else window.setTimeout(start,250);
-  },5000);
+    if('requestIdleCallback' in window)window.requestIdleCallback(start,{timeout:1200});
+    else window.setTimeout(start,150);
+  },3500);
 }
 
 function renderApp(){
