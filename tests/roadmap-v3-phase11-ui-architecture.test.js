@@ -37,6 +37,15 @@ test('Phase 11 keeps existing coaching, workout and race enhancements available'
   }
 });
 
+test('Phase 11 gives Fuel Planner and Learn one canonical owner instead of duplicate Home subpages',()=>{
+  const shell=read('src/ShellNextV3.jsx');
+  assert.doesNotMatch(shell,/const FuelBuilder=lazy/);
+  assert.doesNotMatch(shell,/const LearnPage=lazy/);
+  assert.doesNotMatch(shell,/HomeSubpageHead/);
+  assert.doesNotMatch(shell,/openHomeView/);
+  assert.match(shell,/section==='home'&&<HomeIndex goRoute=\{setSection\}/);
+});
+
 test('Fuel shortage navigation matches the live seven-day ordering flow',()=>{
   const nav=read('src/navigation-registry.js');
   assert.match(nav,/short for the next 7 days/);
