@@ -10,7 +10,8 @@ test('onboarding mounts once in its own deferred root so first paint stays fast'
   assert.match(source,/await import\('\.\/AthleteOnboardingGate'\)/);
   assert.match(source,/requestIdleCallback/);
   assert.match(source,/getElementById\('jf-onboarding-root'\)/);
-  assert.match(source,/if\(onboardingRoot\)return/);
+  assert.match(source,/window\.__JF_ONBOARDING_ROOT__/);
+  assert.match(source,/window\.__JF_ONBOARDING_SCHEDULED__/);
   assert.match(source,/scheduleOnboarding\(\)/);
   assert.doesNotMatch(source,/<DeferredOnboarding\s*\/>/);
 });
