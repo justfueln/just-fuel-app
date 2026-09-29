@@ -29,7 +29,7 @@ test('smart alerts do not compete with Home during first paint',()=>{
 
 test('onboarding and legacy PWA cleanup are deferred startup maintenance',()=>{
   const main=read('src/main.jsx');
-  assert.match(main,/\},5000\);/);
+  assert.match(main,/\},3500\);/);
   assert.match(main,/loadGlobalEnhancements\(\);\},2500/);
   assert.match(main,/handOffLegacyWorker\(\).*\},6000\)/s);
   assert.match(main,/jf-onboarding-phase6-complete/);
