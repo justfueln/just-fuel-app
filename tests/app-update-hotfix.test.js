@@ -23,11 +23,13 @@ test('startup no longer downloads Training and Race observer modules globally',a
   assert.doesNotMatch(main,/import\('\.\/race-goal-progress-v1'\)/);
 });
 
-test('heavy enhancement modules are scoped to the active section',async()=>{
+test('heavy enhancement modules are scoped to the active section and Training subview',async()=>{
   const shell=await readFile(shellUrl,'utf8');
   const loader=await readFile(routeEnhancementsUrl,'utf8');
-  assert.match(shell,/loadEnhancementsForSection\(section\)/);
+  assert.match(shell,/loadEnhancementsForSection\(section,\{trainingView\}\)/);
   assert.match(loader,/section==='training'/);
+  assert.match(loader,/trainingView==='plan'/);
+  assert.match(loader,/trainingView==='progress'/);
   assert.match(loader,/section==='race'/);
   assert.match(loader,/import\('\.\/training-coach-v1'\)/);
   assert.match(loader,/import\('\.\/race-addon-stability'\)/);
