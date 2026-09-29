@@ -3,6 +3,7 @@ import {ArrowLeft,ChevronRight,Droplets,Fuel,Gauge,PackageCheck,RefreshCw,Save,S
 import {supabase} from './main';
 import {FuelBuilder} from './CommercePages';
 import TrainingFuelReview from './TrainingFuelReview';
+import FuelToShopPhase8 from './FuelToShopPhase8';
 import {byKey} from './catalog';
 import {fetchFuelTrainingPlan,fetchTrainingFuelBase,fetchTrainingFuelForecast} from './training-api';
 import {hydratePacks,restockShortfalls} from './fuel-utils';
@@ -144,14 +145,13 @@ export default function FuelHubV2({addLine,openBasket,viewTarget='home',onViewCh
   if(view==='review')return <FuelPageFrame title="Fuel Review" subtitle="Compare planned fuel with what you actually used." onBack={back}><TrainingFuelReview/></FuelPageFrame>;
   if(view==='training')return <FuelPageFrame title="Plan Fuel" subtitle="Sport-aware fuel, hydration and recovery for upcoming training." onBack={back}><TrainingFuel plan={futurePlan} fuelProfile={fuelProfile} userId={session?.user?.id} reload={loadAll} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
   if(view==='stock')return <FuelPageFrame title="Update Stock" subtitle="Keep your cupboard stock up to date." onBack={back}><StockPage session={session} stock={stock} reload={loadAll}/></FuelPageFrame>;
-  if(view==='order')return <FuelPageFrame title="Order Shortage" subtitle="Only the shortfall for your selected training horizon." onBack={back}><OrderNeeded forecast={forecastReady?forecast:[]} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
+  if(view==='order')return <FuelPageFrame title="Order Shortage" subtitle="Your exact 7-day fuel shortfall." onBack={back}><FuelToShopPhase8 forecast={forecastReady?forecast:[]} addLine={addLine} openBasket={openBasket}/></FuelPageFrame>;
 
   return <div className="fuel-v2-shell fuel-v3-home">
     <header className="fuel-v2-head">
       <div><span className="eyebrow">FUEL</span><h2>What do I need?</h2><p>Your upcoming fuel requirement, what you already have and what is short.</p></div>
       {session?.user&&<button className="icon-btn" onClick={()=>loadAll()} disabled={loading} aria-label="Refresh fuel"><RefreshCw size={18}/></button>}
     </header>
-
     {!session?.user&&<section className="card fuel-v2-signin"><Fuel size={24}/><div><h3>Start with a simple fuel plan</h3><p className="muted">The Quick Fuel Planner works without a login. Sign in under Training to unlock automatic training needs, stock and shortfall forecasting.</p></div></section>}
     {message&&<div className="notice">{message}</div>}
 
