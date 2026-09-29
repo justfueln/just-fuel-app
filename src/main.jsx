@@ -49,6 +49,7 @@ import './training-power-curve-v1.css';
 import './training-achievements-v1.css';
 import './race-goal-progress-v1.css';
 import './race-fuel-rehearsal-v1.css';
+import './training-header-clearance-hotfix.css';
 
 const CURRENT_APP_VERSION='16';
 const PWA_CLEAN_KEY=`jf-pwa-clean-v${CURRENT_APP_VERSION}`;
