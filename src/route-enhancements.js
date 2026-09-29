@@ -4,11 +4,11 @@ import './training-native-v11.css';
 const loaded={global:false,training:false,race:false};
 let smartCoachPromise=null;
 
-function idle(task,timeout=1200){
+function idle(task,timeout=1200,fallback=250){
   const run=()=>Promise.resolve().then(task).catch(error=>console.warn('Deferred Just Fuel enhancement failed:',error));
   if(typeof window==='undefined')return;
   if('requestIdleCallback'in window)window.requestIdleCallback(run,{timeout});
-  else window.setTimeout(run,180);
+  else window.setTimeout(run,fallback);
 }
 
 function ensureSmartCoach(){
@@ -19,25 +19,29 @@ function ensureSmartCoach(){
 export function loadGlobalEnhancements(){
   if(loaded.global)return;
   loaded.global=true;
-  idle(()=>Promise.all([import('./basketBridge'),import('./app-analytics'),import('./final-ux-v10')]),1800);
+  idle(()=>Promise.all([import('./basketBridge'),import('./app-analytics'),import('./final-ux-v10')]),3000,1200);
 }
 
 export function loadEnhancementsForSection(section){
   if(typeof window==='undefined')return;
 
-  // Home stays first-paint focused: coaching polish loads only once the browser is idle.
-  if(section==='home')idle(()=>ensureSmartCoach(),900);
+  // Never compete with Home/startup for the main thread.
+  if(section==='home')idle(()=>ensureSmartCoach(),3200,1800);
 
   if(section==='training'&&!loaded.training){
     loaded.training=true;
-    Promise.all([
+
+    // First let the native Training screen become interactive. These modules enhance
+    // existing content but are not required for the first tap/paint.
+    idle(()=>Promise.all([
       ensureSmartCoach(),
-      // Phase 11: the outer React shell now owns Today / Plan / Progress navigation.
-      // Do not load training-simple-flow-v4: it renamed/hid/inserted controls after render.
       import('./training-workout-details'),
       import('./training-multisport-targets-v1'),
       import('./training-feedback')
-    ]).catch(error=>console.warn('Training enhancement load failed:',error));
+    ]),2200,900);
+
+    // Deeper coaching/performance helpers are deliberately later so lower-end phones
+    // do not parse and execute a large enhancement burst immediately after navigation.
     idle(()=>Promise.all([
       import('./training-boost-control'),
       import('./training-coach-v1'),
@@ -50,21 +54,20 @@ export function loadEnhancementsForSection(section){
       import('./training-ftp-detection-v1'),
       import('./training-power-curve-v1'),
       import('./training-achievements-v1')
-    ]),1000);
+    ]),5200,2600);
   }else if(section==='training'){
-    ensureSmartCoach().catch(error=>console.warn('Smart Coach load failed:',error));
+    idle(()=>ensureSmartCoach(),1600,700);
   }
 
   if(section==='race'&&!loaded.race){
     loaded.race=true;
-    import('./race-addon-stability')
+    idle(()=>import('./race-addon-stability')
       .then(()=>Promise.all([
         import('./race-goal-progress-v1'),
         import('./race-fuel-rehearsal-v1'),
         import('./race-week-execution-v1'),
         import('./race-fuzzy-search-v1')
-      ]))
-      .catch(error=>console.warn('Race enhancement load failed:',error));
+      ])),1800,700);
   }
 }
 
