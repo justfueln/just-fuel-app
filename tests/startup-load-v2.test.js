@@ -30,7 +30,9 @@ test('smart alerts do not compete with Home during first paint',()=>{
 test('onboarding and legacy PWA cleanup are deferred startup maintenance',()=>{
   const main=read('src/main.jsx');
   assert.match(main,/\},5000\);/);
+  assert.match(main,/loadGlobalEnhancements\(\),2500/);
   assert.match(main,/handOffLegacyWorker\(\).*\},6000\)/s);
+  assert.match(main,/jf-onboarding-phase6-complete/);
 });
 
 test('stable vendor libraries are split for stronger browser caching',()=>{
@@ -39,4 +41,12 @@ test('stable vendor libraries are split for stronger browser caching',()=>{
   assert.match(vite,/supabase-vendor/);
   assert.match(vite,/icons-vendor/);
   assert.match(vite,/manualChunks/);
+});
+
+test('Home production RPC stays off the heavyweight fuel view',()=>{
+  const sql=read('scripts/home-dashboard-emergency-fast.sql');
+  assert.match(sql,/create or replace function public\.get_today_dashboard/);
+  assert.match(sql,/training_rolling_summary/);
+  assert.doesNotMatch(sql,/training_session_fuel_plan_multisport/);
+  assert.match(sql,/'fuel_ready',false/);
 });
