@@ -3,6 +3,7 @@ import { Activity, ArrowLeft, Flag, Fuel, Home, ShoppingBag, Store, UserRound } 
 import { ReminderBanner } from './MorePage';
 import useWeeklyReminder from './useWeeklyReminder';
 import HomeIndex from './HomeIndex';
+import SmartAlerts from './SmartAlerts';
 import { APP_ROUTES, BOTTOM_NAV, TRAINING_NAV, normalizeFuelView, trainingTabForRoute, trainingTargetForView, trainingViewFromState } from './navigation-registry';
 import { basketTtlMs, lastBasketTtlMs, normalizeMainSection, readSavedItems, resolveInitialMainSection } from './app-state-utils';
 import {loadEnhancementsForSection} from './route-enhancements';
@@ -87,6 +88,12 @@ export default function ShellNextV3(){
   function closeBasket(){if(window.history.state?.jfBasket)window.history.back();else setBasketOpen(false)}
   function rememberBasket(items){if(!items?.length)return;setLastBasket(items.map(x=>({...x})))}
   function repeatLastBasket(){if(!lastBasket.length)return;setBasket(lastBasket.map(x=>({...x})));openBasket()}
+  function openSmartAlert(alert){
+    if(alert?.route==='fuel'){setSection('fuel',{fuelView:alert.fuelView||'home'});return}
+    if(alert?.route==='training'){setSection('training');return}
+    if(alert?.route==='race'){setSection('race');return}
+    setSection('home');
+  }
 
   useEffect(()=>{
     const url=new URL(window.location.href);
@@ -139,6 +146,7 @@ export default function ShellNextV3(){
     {(!isTrainingArea||profileOpen)&&<CurrentAppHeader count={basketCount} onBasket={openBasket} onProfile={profileOpen?closeProfile:openProfile} profileOpen={profileOpen}/>} 
     {isTrainingArea&&!profileOpen&&<><button className="training-profile-button" onClick={openProfile} aria-label="Profile and settings"><UserRound size={21}/></button><button className="training-basket" onClick={openBasket} aria-label="Open basket"><ShoppingBag size={22}/>{basketCount>0&&<span>{basketCount}</span>}</button></>}
     {reminderDue&&!isTrainingArea&&!profileOpen&&<ReminderBanner reminder={reminder} onPlan={()=>{setSection('fuel',{fuelView:'planner'});dismissReminder()}} onDismiss={dismissReminder}/>} 
+    {!reminderDue&&!profileOpen&&!basketOpen&&<SmartAlerts onAction={openSmartAlert} hidden={isTrainingArea}/>} 
 
     <div className="shell-content">
       <Suspense fallback={<RouteLoading/>}>
@@ -156,7 +164,7 @@ export default function ShellNextV3(){
       </Suspense>
     </div>
 
-    {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>})}</nav>}
+    {!profileOpen&&<nav className="bottom-nav phase1-nav" aria-label="Main navigation">{BOTTOM_NAV.map(id=>{const route=APP_ROUTES[id],Icon=NAV_ICONS[id];return <button key={id} className={section===id?'active':''} onClick={()=>setSection(id)}><Icon size={25}/><span>{route.label}</span></button>)}</nav>}
     {basketOpen&&<Suspense fallback={null}><CheckoutDrawer open close={closeBasket} basket={basket} lastBasket={lastBasket} repeatLastBasket={repeatLastBasket} remember={rememberBasket} count={basketCount} total={basketTotal} setQty={setLineQty} clear={()=>setBasket([])}/></Suspense>}
   </div>;
 }
