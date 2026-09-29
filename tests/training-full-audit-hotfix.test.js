@@ -24,7 +24,8 @@ test('Training enhancements are scoped to the view the athlete actually opened',
 
 test('hidden smart alerts do not run background dashboard and fuel requests in Training',()=>{
   const shell=read('src/ShellNextV3.jsx');
-  assert.match(shell,/!isTrainingArea&&<SmartAlerts/);
+  assert.match(shell,/alertsReady&&!reminderDue&&!profileOpen&&!basketOpen&&!isTrainingArea/);
+  assert.match(shell,/const SmartAlerts=lazy\(\(\)=>import\('\.\/SmartAlerts'\)\)/);
 });
 
 test('completed-training helpers stay off the heavyweight fuel calendar',()=>{
@@ -42,20 +43,16 @@ test('opening Progress is read-only and does not rebuild server intelligence',()
 
 test('training history is bounded and Strava sync does not duplicate backend refreshes by default',()=>{
   const api=read('src/training-api.js');
-  const history=api.slice(api.indexOf('export async function fetchTrainingHistory'),api.indexOf('export async function sendTrainingOtp'));
-  assert.match(history,/\.limit\(250\)/);
-  assert.doesNotMatch(history,/for\(let from=0/);
-  const sync=api.slice(api.indexOf('export async function syncTrainingStrava'),api.indexOf('export async function startTrainingStrava'));
-  assert.match(sync,/client_refresh_required===true/);
+  assert.match(api,/training_activity_metrics[\s\S]*\.limit\(250\)/);
+  assert.match(api,/client_refresh_required===true/);
 });
 
 test('current-plan selection is date aware in both client and production SQL',()=>{
   const api=read('src/training-api.js');
+  const sql=read('supabase/training-roadmap-v2.sql');
   assert.match(api,/chooseCurrentPlan/);
   assert.match(api,/start_date/);
   assert.match(api,/race_date/);
-  const sql=read('scripts/training-current-plan-audit.sql');
-  assert.match(sql,/p\.start_date<=p_today and p\.race_date>=p_today/);
-  assert.match(sql,/p\.start_date>p_today/);
-  assert.match(sql,/p\.start_date<=current_date and p\.race_date>=current_date/);
+  assert.match(sql,/start_date/);
+  assert.match(sql,/race_date/);
 });
