@@ -21,7 +21,7 @@ async function load(force=false){
   ]);
   const planId=planResult.data?.id;let row=null;
   if(planId){
-    const r=await sb.from('training_plan_calendar_with_fuel').select('id,title,session_date,status').eq('user_id',uid).eq('plan_id',planId).eq('session_date',today).order('is_key_session',{ascending:false}).limit(1).maybeSingle();
+    const r=await sb.from('training_plan_calendar').select('id,title,session_date,status,is_key_session').eq('user_id',uid).eq('plan_id',planId).eq('session_date',today).order('is_key_session',{ascending:false}).limit(1).maybeSingle();
     row=r.data||null;
   }
   cache={readiness:readyResult.data||null,row};cacheAt=Date.now();return cache;
@@ -59,6 +59,6 @@ if(typeof window!=='undefined'){
   window.addEventListener('load',()=>queue());
   window.addEventListener('popstate',()=>queue());
   ['jf-readiness-saved','jf-training-plan-updated'].forEach(name=>window.addEventListener(name,()=>{reset();queue(true)}));
-  const start=()=>{if(!document.body)return;new MutationObserver(m=>{if(m.some(x=>x.addedNodes.length||x.removedNodes.length))queue()}).observe(document.body,{childList:true,subtree:true});queue()};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  document.addEventListener('change',e=>{if(e.target?.closest?.('.plan-view-select'))queue()});
+  queue();
 }
