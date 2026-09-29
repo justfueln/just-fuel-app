@@ -16,7 +16,7 @@ function ensureSmartCoach(){
 export function loadGlobalEnhancements(){
   if(loaded.global)return;
   loaded.global=true;
-  idle(()=>Promise.all([import('./basketBridge'),import('./app-analytics')]),1800);
+  idle(()=>Promise.all([import('./basketBridge'),import('./app-analytics'),import('./final-ux-v10')]),1800);
 }
 
 export function loadEnhancementsForSection(section){
