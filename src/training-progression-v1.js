@@ -10,6 +10,7 @@ function fmtDate(v){if(!v)return'';return new Intl.DateTimeFormat('en-ZA',{weekd
 function label(v){return v==='progress'?'PROGRESS':v==='hold'?'HOLD':v==='protect'?'PROTECT':'BASELINE'}
 function title(v){return v==='progress'?'Coach progressed this workout':v==='hold'?'Progression held for now':v==='protect'?'Recovery load protected':'Building progression evidence'}
 function evaluated(row){return Boolean(row?.progression_applied_at||row?.progression_reason)}
+function datePlus(days){const d=new Date();d.setDate(d.getDate()+days);return d.toISOString().slice(0,10)}
 
 async function load(force=false){
   if(!force&&cache&&Date.now()-cacheAt<45000)return cache;
@@ -19,9 +20,9 @@ async function load(force=false){
     const uid=session.user.id;
     const{data:plan}=await sb.from('training_plans').select('id').eq('user_id',uid).eq('status','active').order('generated_at',{ascending:false}).limit(1).maybeSingle();
     if(!plan?.id)return null;
-    const{data:rows,error}=await sb.from('training_plan_calendar_with_fuel')
+    const{data:rows,error}=await sb.from('training_plan_calendar')
       .select('id,title,session_date,session_type,planned_duration_minutes,duration_minutes,target_power_low_w,target_power_high_w,progression_status,progression_factor,progression_reason,progression_source_count,progression_applied_at')
-      .eq('user_id',uid).eq('plan_id',plan.id).gte('session_date',new Date().toISOString().slice(0,10)).order('session_date',{ascending:true});
+      .eq('user_id',uid).eq('plan_id',plan.id).gte('session_date',new Date().toISOString().slice(0,10)).lte('session_date',datePlus(56)).order('session_date',{ascending:true}).limit(60);
     if(error)throw error;
     const list=rows||[];
     cache={rows:list,rowMap:new Map(list.map(x=>[x.id,x]))};cacheAt=Date.now();return cache;
@@ -82,6 +83,6 @@ function queue(force=false){if(queued)return;queued=true;setTimeout(()=>{queued=
 if(typeof window!=='undefined'){
   window.addEventListener('load',()=>queue());window.addEventListener('popstate',()=>queue());
   ['jf-training-plan-updated','jf-training-feedback-saved','jf-readiness-saved'].forEach(name=>window.addEventListener(name,()=>{reset();queue(true)}));
-  const start=()=>{if(!document.body)return;new MutationObserver(m=>{if(m.some(x=>x.addedNodes.length||x.removedNodes.length))queue()}).observe(document.body,{childList:true,subtree:true});queue()};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+  document.addEventListener('change',e=>{if(e.target?.closest?.('.plan-view-select'))queue()});
+  queue();
 }
