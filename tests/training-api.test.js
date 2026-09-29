@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fetchTrainingHistory, fetchTrainingPlan } from '../src/training-api.js';
 
-function query(result){
+function query(result,{onEq}={}){
   const chain={
-    select(){return chain},eq(){return chain},order(){return chain},limit(){return chain},range(){return chain},
+    select(){return chain},
+    eq(column,value){onEq?.(column,value);return chain},
+    order(){return chain},limit(){return chain},range(){return chain},
     maybeSingle(){return Promise.resolve(result)},
     then(resolve,reject){return Promise.resolve(result).then(resolve,reject)}
   };
@@ -12,14 +14,20 @@ function query(result){
 }
 
 test('training plan service returns only the active plan sessions',async()=>{
+  const tables=[];
+  const filters=[];
   const client={from(table){
-    if(table==='training_plan_calendar_with_fuel')return query({data:[{id:1,plan_id:'active'},{id:2,plan_id:'old'}],error:null});
-    if(table==='training_plans')return query({data:{id:'active'},error:null});
+    tables.push(table);
+    if(table==='training_plans')return query({data:{id:'active'},error:null},{onEq:(column,value)=>filters.push([table,column,value])});
+    if(table==='training_plan_calendar')return query({data:[{id:1,plan_id:'active'}],error:null},{onEq:(column,value)=>filters.push([table,column,value])});
     throw new Error(`Unexpected table ${table}`);
   }};
   const result=await fetchTrainingPlan(client,'user-1');
   assert.equal(result.error,null);
   assert.deepEqual(result.plan,[{id:1,plan_id:'active'}]);
+  assert.deepEqual(tables,['training_plans','training_plan_calendar']);
+  assert.ok(filters.some(([table,column,value])=>table==='training_plan_calendar'&&column==='plan_id'&&value==='active'));
+  assert.ok(filters.some(([table,column,value])=>table==='training_plan_calendar'&&column==='user_id'&&value==='user-1'));
 });
 
 test('training history reads the deduplicated multisport metrics view and maps effective metrics plus JF load',async()=>{
