@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Just Fuel Ops</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div><div class="eyebrow">JUST FUEL NUTRITION</div><h1>Just Fuel Ops</h1></div>
+    <button id="installBtn" class="ghost" hidden>Install</button>
+  </header>
+  <main id="app" class="app-shell">
+    <section class="view active" data-view="home"><div class="section-head"><div><p class="eyebrow">TODAY</p><h2>Operations dashboard</h2></div><button class="primary" data-action="new-order">+ Order</button></div><div id="kpis" class="kpi-grid"></div><div class="panel"><div class="panel-head"><h3>Attention</h3><span class="muted">Auto-calculated</span></div><div id="alerts"></div></div><div class="panel"><div class="panel-head"><h3>Latest orders</h3><button class="link-btn" data-nav="orders">View all</button></div><div id="homeOrders"></div></div></section>
+    <section class="view" data-view="orders"><div class="section-head"><div><p class="eyebrow">SALES</p><h2>Orders</h2></div><button class="primary" data-action="new-order">+ New</button></div><div class="segmented" id="orderFilters"><button class="active" data-filter="all">All</button><button data-filter="new">New</button><button data-filter="awaiting payment">Awaiting</button><button data-filter="paid">Paid</button><button data-filter="ready">Ready</button></div><div id="ordersList"></div></section>
+    <section class="view" data-view="production"><div class="section-head"><div><p class="eyebrow">MANUFACTURING</p><h2>Production</h2></div><button class="primary" data-action="new-batch">+ Batch</button></div><div class="panel"><div class="panel-head"><h3>Required from open orders</h3><span class="muted">After finished stock</span></div><div id="productionNeeds"></div></div><div class="panel"><div class="panel-head"><h3>Recent batches</h3></div><div id="batchList"></div></div></section>
+    <section class="view" data-view="stock"><div class="section-head"><div><p class="eyebrow">INVENTORY</p><h2>Stock</h2></div><button class="primary" data-action="stock-adjust">Adjust</button></div><div class="segmented" id="stockTabs"><button class="active" data-stocktab="finished">Finished</button><button data-stocktab="raw">Raw materials</button><button data-stocktab="recipes">Recipes</button></div><div id="stockContent"></div></section>
+    <section class="view" data-view="more"><div class="section-head"><div><p class="eyebrow">BUSINESS</p><h2>More</h2></div></div><div class="menu-grid"><button class="menu-card" data-open-panel="customers"><strong>Customers</strong><span>Order history & contact details</span></button><button class="menu-card" data-open-panel="finance"><strong>Finance</strong><span>Outstanding & paid orders</span></button><button class="menu-card" data-open-panel="suppliers"><strong>Suppliers</strong><span>Raw material suppliers</span></button><button class="menu-card" data-open-panel="reports"><strong>Reports</strong><span>Sales, stock & production</span></button><button class="menu-card" data-open-panel="settings"><strong>Settings</strong><span>Business & integrations</span></button></div><div id="morePanel" class="panel hidden"></div></section>
+  </main>
+  <nav class="bottom-nav"><button class="active" data-nav="home"><span>⌂</span>Home</button><button data-nav="orders"><span>▤</span>Orders</button><button data-nav="production"><span>⚙</span>Production</button><button data-nav="stock"><span>▦</span>Stock</button><button data-nav="more"><span>•••</span>More</button></nav>
+  <dialog id="modal"><form method="dialog" id="modalForm"><div class="modal-head"><h3 id="modalTitle"></h3><button class="icon-btn" value="cancel" aria-label="Close">×</button></div><div id="modalBody"></div><div id="modalActions" class="modal-actions"></div></form></dialog>
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
