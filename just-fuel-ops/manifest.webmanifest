@@ -1,0 +1,10 @@
+{
+  "name":"Just Fuel Ops",
+  "short_name":"JF Ops",
+  "description":"Just Fuel Nutrition operations, stock, production and order management.",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#f4f4f2",
+  "theme_color":"#111111",
+  "icons":[{"src":"icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
