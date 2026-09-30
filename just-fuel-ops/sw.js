@@ -1,4 +1,4 @@
-const CACHE='jf-ops-shell-v4';
+const CACHE='jf-ops-shell-v5';
 const SHELL=['./','./index.html','./styles.css','./secure.css','./secure.js','./manifest.webmanifest','./icons/icon.svg'];
 
 self.addEventListener('install',event=>{
@@ -24,7 +24,7 @@ self.addEventListener('fetch',event=>{
   if(url.origin!==self.location.origin) return;
 
   event.respondWith(
-    fetch(request)
+    fetch(request,{cache:'no-store'})
       .then(response=>{
         if(response.ok){
           const copy=response.clone();
