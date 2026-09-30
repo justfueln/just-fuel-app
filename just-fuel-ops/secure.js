@@ -1,51 +1,108 @@
 'use strict';
-const URL='https://ufolqntrfmvefpvrjnsa.supabase.co';
-const KEY='sb_publishable_dQVErA2uFoym91L-vsW-kw_n6dWJfqy';
-const db=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+
+const SUPABASE_URL='https://ufolqntrfmvefpvrjnsa.supabase.co';
+const SUPABASE_KEY='sb_publishable_dQVErA2uFoym91L-vsW-kw_n6dWJfqy';
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
 const money=n=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(Number(n||0));
-const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-let role='none',email='',filter='all',tab='finished',deferredPrompt=null,idleTimer=null;
+const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
+let db=null, pendingEmail='', role='none', orderFilter='all', stockTab='finished', deferredPrompt=null;
 const S={customers:[],products:[],raw:[],orders:[],items:[],batches:[],payments:[]};
-function show(id){['loadingGate','authGate','setupGate','appRoot'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==id));}
-function msg(id,t,ok=false){const e=$(id);e.textContent=t||'';e.className='form-message'+(ok?' success-text':'');}
-function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1800)}
-async function init(){show('loadingGate');const{data:{session}}=await db.auth.getSession();await sessionGate(session);db.auth.onAuthStateChange((_e,s)=>setTimeout(()=>sessionGate(s),0));}
-async function sessionGate(session){if(!session?.user){show('authGate');return;}const{data,error}=await db.rpc('ops_access_status');if(error||!data?.has_access){show('setupGate');msg('#setupMessage',error?'Access check failed. Please sign out and try again.':'Signed in, but this account is not approved for Ops yet.');return;}role=data.role||'staff';$('#roleBadge').textContent=role;show('appRoot');resetIdle();await load();}
-async function load(){const q=await Promise.all([
- db.from('ops_customers').select('*').eq('is_active',true).order('full_name'),
- db.from('ops_products').select('*').eq('is_active',true).order('name'),
- db.from('ops_raw_materials').select('*').eq('is_active',true).order('name'),
- db.from('ops_orders').select('*').order('created_at',{ascending:false}).limit(200),
- db.from('ops_order_items').select('*'),
- db.from('ops_production_batches').select('*').order('created_at',{ascending:false}).limit(100),
- db.from('ops_payments').select('*').order('created_at',{ascending:false}).limit(200)
-]);if(q.some(x=>x.error)){console.error(q.find(x=>x.error)?.error);toast('Could not load Ops data');return;}[S.customers,S.products,S.raw,S.orders,S.items,S.batches,S.payments]=q.map(x=>x.data||[]);render();}
+
+function show(id){['loadingGate','authGate','setupGate','appRoot'].forEach(x=>{const el=$('#'+x);if(el)el.classList.toggle('hidden',x!==id);});}
+function message(id,text,ok=false){const e=$(id);if(!e)return;e.textContent=text||'';e.className='form-message'+(ok?' success-text':'');}
+function toast(text){const e=$('#toast');if(!e)return;e.textContent=text;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200);}
+function failStartup(text){show('authGate');message('#authMessage',text||'Could not start Just Fuel Ops. Please refresh and try again.');}
+
+async function withTimeout(p,ms=10000){return Promise.race([p,new Promise((_,rej)=>setTimeout(()=>rej(new Error('Request timed out')),ms))]);}
+
+async function start(){
+  show('loadingGate');
+  try{
+    if(!window.supabase?.createClient) throw new Error('Secure connection library did not load');
+    db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    const {data,error}=await withTimeout(db.auth.getSession());
+    if(error) throw error;
+    await sessionGate(data?.session||null);
+    db.auth.onAuthStateChange((_event,session)=>setTimeout(()=>sessionGate(session),0));
+  }catch(err){console.error(err);failStartup(err?.message||'Startup failed');}
+}
+
+async function sessionGate(session){
+  if(!session?.user){show('authGate');return;}
+  try{
+    const {data,error}=await withTimeout(db.rpc('ops_access_status'));
+    if(error) throw error;
+    if(!data?.has_access){show('setupGate');message('#setupMessage','Signed in, but this account is not approved for Just Fuel Ops yet.');return;}
+    role=data.role||'staff';
+    if($('#roleBadge')) $('#roleBadge').textContent=role;
+    show('appRoot');
+    await loadData();
+  }catch(err){console.error(err);show('setupGate');message('#setupMessage','Ops access check failed. Please sign out and try again.');}
+}
+
+async function loadData(){
+  try{
+    const q=await withTimeout(Promise.all([
+      db.from('ops_customers').select('*').eq('is_active',true).order('full_name'),
+      db.from('ops_products').select('*').eq('is_active',true).order('name'),
+      db.from('ops_raw_materials').select('*').eq('is_active',true).order('name'),
+      db.from('ops_orders').select('*').order('created_at',{ascending:false}).limit(200),
+      db.from('ops_order_items').select('*'),
+      db.from('ops_production_batches').select('*').order('created_at',{ascending:false}).limit(100),
+      db.from('ops_payments').select('*').order('created_at',{ascending:false}).limit(200)
+    ]),15000);
+    const bad=q.find(x=>x.error);if(bad)throw bad.error;
+    [S.customers,S.products,S.raw,S.orders,S.items,S.batches,S.payments]=q.map(x=>x.data||[]);
+    renderAll();
+  }catch(err){console.error(err);toast('Could not load Ops data');renderAll();}
+}
+
 const customer=id=>S.customers.find(x=>x.id===id)||{full_name:'Unknown customer'};
 const product=id=>S.products.find(x=>x.id===id)||{name:'Unknown product',unit_price:0,stock_on_hand:0,stock_reserved:0,reorder_level:0};
-const oi=id=>S.items.filter(x=>x.order_id===id);
-const total=o=>Number(o.total_amount||oi(o.id).reduce((t,i)=>t+Number(i.line_total||0),0));
-const sl=s=>String(s||'').replaceAll('_',' ');
-function badge(s){const c=['paid','ready','delivered','completed'].includes(s)?'good':['awaiting_payment','production','packing','planned'].includes(s)?'warn':s==='cancelled'?'bad':'';return `<span class="pill ${c}">${esc(sl(s))}</span>`}
-function nav(v){$$('.view').forEach(x=>x.classList.toggle('active',x.dataset.view===v));$$('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===v));render();scrollTo({top:0,behavior:'smooth'});}
-function render(){home();orders();production();stock();}
-function row(o,actions=false){const c=customer(o.customer_id),items=oi(o.id),sum=items.length?items.map(i=>`${Number(i.quantity)}× ${product(i.product_id).name}`).join(' · '):'No items';const acts=actions?`<div class="row-actions">${c.phone?`<button class="mini-btn" data-wa="${o.id}">WhatsApp</button>`:''}${!['paid','ready','delivered'].includes(o.status)?`<button class="mini-btn" data-status="paid" data-id="${o.id}">Mark paid</button>`:''}${['paid','packing'].includes(o.status)?`<button class="mini-btn" data-status="ready" data-id="${o.id}">Ready</button>`:''}</div>`:'';return `<div class="row"><div class="row-main"><strong>${esc(o.order_number)} · ${esc(c.full_name)}</strong><small>${esc(sl(o.source))} · ${esc(sum)}</small>${acts}</div><div style="text-align:right"><div class="money">${money(total(o))}</div>${badge(o.status)}</div></div>`}
-function home(){const open=S.orders.filter(o=>!['ready','delivered','cancelled'].includes(o.status)),out=S.orders.filter(o=>['unpaid','partial'].includes(o.payment_status)).reduce((t,o)=>t+total(o),0),lowP=S.products.filter(p=>Number(p.stock_on_hand)-Number(p.stock_reserved)<=Number(p.reorder_level)),lowR=S.raw.filter(r=>Number(r.quantity_on_hand)<=Number(r.reorder_level));$('#kpis').innerHTML=[['Open orders',open.length],['Outstanding',money(out)],['Low stock',lowP.length+lowR.length],['Customers',S.customers.length]].map(x=>`<div class="kpi"><div class="label">${x[0]}</div><div class="value">${x[1]}</div></div>`).join('');const a=[...lowP.slice(0,4).map(p=>`<div class="alert"><strong>${esc(p.name)}</strong> — ${esc(p.stock_on_hand)} available; reorder ${esc(p.reorder_level)}.</div>`),...lowR.slice(0,4).map(r=>`<div class="alert"><strong>${esc(r.name)}</strong> — ${esc(r.quantity_on_hand)} ${esc(r.unit)} available.</div>`)];$('#alerts').innerHTML=a.length?a.join(''):'<div class="empty-state"><strong>No stock alerts</strong>Nothing needs attention yet.</div>';$('#homeOrders').innerHTML=S.orders.length?S.orders.slice(0,5).map(o=>row(o)).join(''):'<div class="empty-state"><strong>No live orders yet</strong>New orders will appear here.</div>';}
-function orders(){const a=S.orders.filter(o=>filter==='all'||o.status===filter);$('#ordersList').innerHTML=a.length?`<div class="panel">${a.map(o=>row(o,true)).join('')}</div>`:'<div class="panel empty-state"><strong>No orders in this filter</strong></div>';}
-function production(){const req={};S.orders.filter(o=>!['ready','delivered','cancelled'].includes(o.status)).forEach(o=>oi(o.id).forEach(i=>req[i.product_id]=(req[i.product_id]||0)+Number(i.quantity)));const needs=Object.entries(req).map(([id,q])=>{const p=product(id),av=Math.max(0,Number(p.stock_on_hand)-Number(p.stock_reserved));return{...p,q,av,need:Math.max(0,q-av)}}).sort((a,b)=>b.need-a.need);$('#productionNeeds').innerHTML=needs.length?needs.map(x=>`<div class="row"><div class="row-main"><strong>${esc(x.name)}</strong><small>Orders ${x.q} · Available ${x.av}</small></div><div class="qty">${x.need?'Make '+x.need:'Covered'}</div></div>`).join(''):'<div class="empty-state"><strong>No production demand yet</strong></div>';$('#batchList').innerHTML=S.batches.length?S.batches.map(b=>`<div class="row"><div class="row-main"><strong>${esc(b.batch_code)} · ${esc(product(b.product_id).name)}</strong><small>${esc(b.planned_for||'')}</small></div><div><span class="qty">${esc(b.planned_quantity)}</span> ${badge(b.status)}</div></div>`).join(''):'<div class="empty-state"><strong>No batches yet</strong></div>';}
-function stock(){if(tab==='finished')$('#stockContent').innerHTML=S.products.length?`<div class="panel">${S.products.map(p=>{const av=Number(p.stock_on_hand)-Number(p.stock_reserved),low=av<=Number(p.reorder_level);return `<div class="row"><div class="row-main"><strong>${esc(p.name)}</strong><small>${esc(p.sku||'')} · ${esc(p.category)}</small></div><div style="text-align:right"><div class="qty">${esc(av)}</div>${low?'<span class="pill warn">low</span>':''}</div></div>`}).join('')}</div>`:'<div class="panel empty-state"><strong>No finished products yet</strong>Tap + Add.</div>';else if(tab==='raw')$('#stockContent').innerHTML=S.raw.length?`<div class="panel">${S.raw.map(r=>`<div class="row"><div class="row-main"><strong>${esc(r.name)}</strong><small>${esc(r.sku||'')} · Minimum ${esc(r.reorder_level)} ${esc(r.unit)}</small></div><div class="qty">${esc(r.quantity_on_hand)} ${esc(r.unit)}</div></div>`).join('')}</div>`:'<div class="panel empty-state"><strong>No raw materials yet</strong>Tap + Add.</div>';else $('#stockContent').innerHTML='<div class="panel empty-state"><strong>Recipes are protected in Supabase</strong>The recipe ingredient editor is the next Ops module.</div>';}
-function modal(title,body,save,label='Save'){const d=$('#modal');$('#modalTitle').textContent=title;$('#modalBody').innerHTML=body;$('#modalActions').innerHTML=`<button value="cancel" class="secondary">Cancel</button><button type="button" id="modalSave" class="primary">${esc(label)}</button>`;$('#modalSave').onclick=()=>save(d);d.showModal();}
-function addCustomer(){modal('Add customer','<div class="field"><label>Full name</label><input id="cName"></div><div class="field"><label>WhatsApp / phone</label><input id="cPhone" type="tel"></div><div class="field"><label>Email</label><input id="cEmail" type="email"></div>',async d=>{const name=$('#cName').value.trim();if(!name)return toast('Name required');const{error}=await db.from('ops_customers').insert({full_name:name,phone:$('#cPhone').value.trim()||null,email:$('#cEmail').value.trim()||null});if(error)return toast(error.message);d.close();toast('Customer added');await load();more('customers');});}
-function addStock(){if(tab==='finished')modal('Add product','<div class="field"><label>Name</label><input id="pName"></div><div class="grid2"><div class="field"><label>Category</label><input id="pCat"></div><div class="field"><label>SKU</label><input id="pSku"></div></div><div class="grid2"><div class="field"><label>Selling price</label><input id="pPrice" type="number" step="0.01" value="0"></div><div class="field"><label>Opening stock</label><input id="pQty" type="number" value="0"></div></div><div class="field"><label>Reorder level</label><input id="pRe" type="number" value="0"></div>',async d=>{const name=$('#pName').value.trim();if(!name)return toast('Name required');const{error}=await db.from('ops_products').insert({name,category:$('#pCat').value.trim()||'Other',sku:$('#pSku').value.trim()||null,unit_price:Number($('#pPrice').value||0),stock_on_hand:Number($('#pQty').value||0),reorder_level:Number($('#pRe').value||0)});if(error)return toast(error.message);d.close();toast('Product added');await load();});else if(tab==='raw')modal('Add raw material','<div class="field"><label>Name</label><input id="rName"></div><div class="grid2"><div class="field"><label>Unit</label><select id="rUnit"><option>kg</option><option>g</option><option>units</option><option>litres</option><option>ml</option></select></div><div class="field"><label>SKU</label><input id="rSku"></div></div><div class="grid2"><div class="field"><label>Opening quantity</label><input id="rQty" type="number" step="0.001" value="0"></div><div class="field"><label>Reorder level</label><input id="rRe" type="number" step="0.001" value="0"></div></div>',async d=>{const name=$('#rName').value.trim();if(!name)return toast('Name required');const{error}=await db.from('ops_raw_materials').insert({name,unit:$('#rUnit').value,sku:$('#rSku').value.trim()||null,quantity_on_hand:Number($('#rQty').value||0),reorder_level:Number($('#rRe').value||0)});if(error)return toast(error.message);d.close();toast('Raw material added');await load();});else toast('Recipe editor is next');}
-function newOrder(){if(!S.customers.length||!S.products.length)return toast('Add a customer and product first');modal('New order',`<div class="field"><label>Customer</label><select id="oCust">${S.customers.map(c=>`<option value="${c.id}">${esc(c.full_name)}</option>`).join('')}</select></div><div class="grid2"><div class="field"><label>Source</label><select id="oSource"><option value="whatsapp">WhatsApp</option><option value="shopify">Shopify</option><option value="phone">Phone</option><option value="manual">Manual</option><option value="screenshot">Screenshot</option></select></div><div class="field"><label>Status</label><select id="oStatus"><option value="new">New</option><option value="awaiting_payment">Awaiting payment</option><option value="paid">Paid</option></select></div></div><div class="field"><label>Product</label><select id="oProd">${S.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div><div class="field"><label>Quantity</label><input id="oQty" type="number" min="1" value="1"></div>`,async d=>{const p=product($('#oProd').value),qty=Number($('#oQty').value||1),status=$('#oStatus').value,n=`JF-${new Date().toISOString().replace(/\D/g,'').slice(2,14)}`,amt=Number(p.unit_price)*qty;const{data:o,error}=await db.from('ops_orders').insert({order_number:n,customer_id:$('#oCust').value,source:$('#oSource').value,status,payment_status:status==='paid'?'paid':'unpaid',subtotal:amt,total_amount:amt}).select().single();if(error)return toast(error.message);const{error:e2}=await db.from('ops_order_items').insert({order_id:o.id,product_id:p.id,quantity:qty,unit_price:Number(p.unit_price)});if(e2)return toast('Order created; item needs attention');d.close();toast('Order created');await load();},'Create order');}
-function newBatch(){if(!S.products.length)return toast('Add products first');modal('Plan batch',`<div class="field"><label>Product</label><select id="bProd">${S.products.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></div><div class="field"><label>Quantity</label><input id="bQty" type="number" min="1" value="100"></div>`,async d=>{const code=`B-${new Date().toISOString().replace(/\D/g,'').slice(2,14)}`;const{error}=await db.from('ops_production_batches').insert({batch_code:code,product_id:$('#bProd').value,planned_quantity:Number($('#bQty').value||0),planned_for:new Date().toISOString().slice(0,10),status:'planned'});if(error)return toast(error.message);d.close();toast('Batch planned');await load();});}
-function more(type){const e=$('#morePanel');e.classList.remove('hidden');if(type==='customers'){e.innerHTML=`<div class="panel-head"><h3>Customers</h3><button class="mini-btn" id="addCustomer">+ Add</button></div>${S.customers.length?S.customers.map(c=>`<div class="row"><div class="row-main"><strong>${esc(c.full_name)}</strong><small>${esc(c.phone||c.email||'No contact')}</small></div></div>`).join(''):'<div class="empty-state"><strong>No customers yet</strong></div>'}`;$('#addCustomer').onclick=addCustomer;}if(type==='finance'){const out=S.orders.filter(o=>['unpaid','partial'].includes(o.payment_status)).reduce((t,o)=>t+total(o),0),paid=S.payments.filter(p=>p.status==='confirmed').reduce((t,p)=>t+Number(p.amount||0),0);e.innerHTML=`<div class="panel-head"><h3>Finance snapshot</h3></div><div class="row"><strong>Awaiting payment</strong><span class="money">${money(out)}</span></div><div class="row"><strong>Confirmed payments</strong><span class="money">${money(paid)}</span></div>`;}if(type==='security')e.innerHTML=`<div class="panel-head"><h3>Security</h3><span class="pill good"><span class="live-dot"></span>Protected</span></div><div class="security-list"><div class="security-item"><span class="security-dot"></span><div><strong>Email OTP sign-in</strong><div class="muted">No automatic public signups.</div></div></div><div class="security-item"><span class="security-dot"></span><div><strong>Private staff authorization</strong><div class="muted">Current role: ${esc(role)}. Database RLS blocks non-staff.</div></div></div><div class="security-item"><span class="security-dot"></span><div><strong>No secret keys in the PWA</strong><div class="muted">Only a browser-safe publishable key is present.</div></div></div></div>`;else if(type==='suppliers')e.innerHTML='<div class="panel-head"><h3>Suppliers</h3></div><div class="empty-state"><strong>Supplier module ready for next phase</strong></div>';else if(type==='reports')e.innerHTML=`<div class="panel-head"><h3>Reports</h3></div><div class="row"><span>Captured order value</span><span class="money">${money(S.orders.reduce((t,o)=>t+total(o),0))}</span></div>`;}
-async function setStatus(id,status){const payload={status};if(status==='paid')payload.payment_status='paid';const{error}=await db.from('ops_orders').update(payload).eq('id',id);if(error)return toast(error.message);toast('Order updated');await load();}
-function wa(id){const o=S.orders.find(x=>x.id===id),c=customer(o.customer_id);if(!c.phone)return toast('No phone number');const items=oi(o.id).map(i=>`${Number(i.quantity)} × ${product(i.product_id).name}`).join('\n'),ph=String(c.phone).replace(/\D/g,'').replace(/^0/,'27'),text=`Hi ${c.full_name}, thanks for your Just Fuel order.\n\nOrder ${o.order_number}\n${items}\n\nTotal: ${money(total(o))}\nStatus: ${sl(o.status)}\n\nJust Fuel Nutrition`;window.open(`https://wa.me/${ph}?text=${encodeURIComponent(text)}`,'_blank','noopener');}
-$('#emailForm').onsubmit=async e=>{e.preventDefault();email=$('#emailInput').value.trim().toLowerCase();msg('#authMessage','Sending code…',true);const{error}=await db.auth.signInWithOtp({email,options:{shouldCreateUser:false}});if(error)return msg('#authMessage',error.message);$('#emailForm').classList.add('hidden');$('#otpForm').classList.remove('hidden');msg('#authMessage','Check your email for the 6-digit code.',true);};
-$('#otpForm').onsubmit=async e=>{e.preventDefault();const{error}=await db.auth.verifyOtp({email,token:$('#otpInput').value.trim(),type:'email'});if(error)msg('#authMessage',error.message);};
-$('#changeEmailBtn').onclick=()=>{$('#otpForm').classList.add('hidden');$('#emailForm').classList.remove('hidden');msg('#authMessage','');};
-$('#setupForm').onsubmit=async e=>{e.preventDefault();const{data,error}=await db.rpc('ops_claim_first_admin',{p_setup_code:$('#setupCodeInput').value.trim()});if(error)return msg('#setupMessage',error.message);if(data){msg('#setupMessage','Owner access activated.',true);await sessionGate((await db.auth.getSession()).data.session);}};
-async function signout(){await db.auth.signOut();location.reload()};$('#logoutBtn').onclick=signout;$('#setupLogoutBtn').onclick=signout;
-$$('[data-nav]').forEach(b=>b.onclick=()=>nav(b.dataset.nav));$$('[data-action="new-order"]').forEach(b=>b.onclick=newOrder);$('[data-action="new-batch"]').onclick=newBatch;$('[data-action="stock-add"]').onclick=addStock;$$('#orderFilters button').forEach(b=>b.onclick=()=>{filter=b.dataset.filter;$$('#orderFilters button').forEach(x=>x.classList.toggle('active',x===b));orders();});$$('#stockTabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.stocktab;$$('#stockTabs button').forEach(x=>x.classList.toggle('active',x===b));stock();});$$('[data-open-panel]').forEach(b=>b.onclick=()=>more(b.dataset.openPanel));document.addEventListener('click',e=>{const s=e.target.closest('[data-status]');if(s)setStatus(s.dataset.id,s.dataset.status);const w=e.target.closest('[data-wa]');if(w)wa(w.dataset.wa);});
-function resetIdle(){clearTimeout(idleTimer);idleTimer=setTimeout(signout,60*60*1000)};['click','touchstart','keydown'].forEach(ev=>addEventListener(ev,resetIdle,{passive:true}));addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('#installBtn').hidden=false});$('#installBtn').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('#installBtn').hidden=true;}};if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));init();
+const items=id=>S.items.filter(x=>x.order_id===id);
+const total=o=>Number(o.total_amount||items(o.id).reduce((t,i)=>t+Number(i.line_total||0),0));
+const status=s=>String(s||'').replaceAll('_',' ');
+function badge(s){const c=['paid','ready','delivered','completed'].includes(s)?'good':['awaiting_payment','production','packing','planned'].includes(s)?'warn':s==='cancelled'?'bad':'';return `<span class="pill ${c}">${esc(status(s))}</span>`;}
+function orderRow(o){const c=customer(o.customer_id);const list=items(o.id).map(i=>`${Number(i.quantity)}× ${product(i.product_id).name}`).join(' · ')||'No items';return `<div class="row"><div class="row-main"><strong>${esc(o.order_number)} · ${esc(c.full_name)}</strong><small>${esc(status(o.source))} · ${esc(list)}</small></div><div style="text-align:right"><div class="money">${money(total(o))}</div>${badge(o.status)}</div></div>`;}
+
+function renderAll(){renderHome();renderOrders();renderProduction();renderStock();}
+function renderHome(){
+  const open=S.orders.filter(o=>!['ready','delivered','cancelled'].includes(o.status));
+  const outstanding=S.orders.filter(o=>['unpaid','partial'].includes(o.payment_status)).reduce((t,o)=>t+total(o),0);
+  const lowP=S.products.filter(p=>Number(p.stock_on_hand)-Number(p.stock_reserved)<=Number(p.reorder_level));
+  const lowR=S.raw.filter(r=>Number(r.quantity_on_hand)<=Number(r.reorder_level));
+  if($('#kpis')) $('#kpis').innerHTML=[['Open orders',open.length],['Outstanding',money(outstanding)],['Low stock',lowP.length+lowR.length],['Customers',S.customers.length]].map(([a,b])=>`<div class="kpi"><div class="label">${esc(a)}</div><div class="value">${esc(b)}</div></div>`).join('');
+  if($('#alerts')) $('#alerts').innerHTML=[...lowP.map(p=>`<div class="alert"><strong>${esc(p.name)}</strong> — ${esc(Number(p.stock_on_hand)-Number(p.stock_reserved))} available.</div>`),...lowR.map(r=>`<div class="alert"><strong>${esc(r.name)}</strong> — ${esc(r.quantity_on_hand)} ${esc(r.unit)} available.</div>`)].slice(0,8).join('')||'<div class="empty-state"><strong>No stock alerts</strong></div>';
+  if($('#homeOrders')) $('#homeOrders').innerHTML=S.orders.slice(0,5).map(orderRow).join('')||'<div class="empty-state"><strong>No live orders yet</strong></div>';
+}
+function renderOrders(){const arr=S.orders.filter(o=>orderFilter==='all'||o.status===orderFilter);if($('#ordersList'))$('#ordersList').innerHTML=arr.length?`<div class="panel">${arr.map(orderRow).join('')}</div>`:'<div class="panel empty-state"><strong>No orders in this filter</strong></div>';}
+function renderProduction(){
+  const req={};S.orders.filter(o=>!['ready','delivered','cancelled'].includes(o.status)).forEach(o=>items(o.id).forEach(i=>req[i.product_id]=(req[i.product_id]||0)+Number(i.quantity)));
+  const needs=Object.entries(req).map(([id,q])=>{const p=product(id),av=Math.max(0,Number(p.stock_on_hand)-Number(p.stock_reserved));return {...p,q,av,need:Math.max(0,q-av)}}).sort((a,b)=>b.need-a.need);
+  if($('#productionNeeds'))$('#productionNeeds').innerHTML=needs.map(x=>`<div class="row"><div class="row-main"><strong>${esc(x.name)}</strong><small>Orders ${x.q} · Available ${x.av}</small></div><div class="qty">${x.need?'Make '+x.need:'Covered'}</div></div>`).join('')||'<div class="empty-state"><strong>No production demand yet</strong></div>';
+  if($('#batchList'))$('#batchList').innerHTML=S.batches.map(b=>`<div class="row"><div class="row-main"><strong>${esc(b.batch_code)} · ${esc(product(b.product_id).name)}</strong></div><div>${esc(b.planned_quantity)} ${badge(b.status)}</div></div>`).join('')||'<div class="empty-state"><strong>No batches yet</strong></div>';
+}
+function renderStock(){
+  if(!$('#stockContent'))return;
+  if(stockTab==='finished') $('#stockContent').innerHTML=S.products.length?`<div class="panel">${S.products.map(p=>`<div class="row"><div class="row-main"><strong>${esc(p.name)}</strong><small>${esc(p.sku||'')} · ${esc(p.category||'')}</small></div><div class="qty">${esc(Number(p.stock_on_hand)-Number(p.stock_reserved))}</div></div>`).join('')}</div>`:'<div class="panel empty-state"><strong>No finished products yet</strong></div>';
+  else if(stockTab==='raw') $('#stockContent').innerHTML=S.raw.length?`<div class="panel">${S.raw.map(r=>`<div class="row"><div class="row-main"><strong>${esc(r.name)}</strong><small>${esc(r.sku||'')}</small></div><div class="qty">${esc(r.quantity_on_hand)} ${esc(r.unit)}</div></div>`).join('')}</div>`:'<div class="panel empty-state"><strong>No raw materials yet</strong></div>';
+  else $('#stockContent').innerHTML='<div class="panel empty-state"><strong>Recipe editor is the next module</strong></div>';
+}
+function nav(v){$$('.view').forEach(x=>x.classList.toggle('active',x.dataset.view===v));$$('[data-nav]').forEach(x=>x.classList.toggle('active',x.dataset.nav===v));window.scrollTo({top:0});}
+
+$('#emailForm')?.addEventListener('submit',async e=>{e.preventDefault();pendingEmail=$('#emailInput').value.trim().toLowerCase();message('#authMessage','Sending code…',true);try{const {error}=await withTimeout(db.auth.signInWithOtp({email:pendingEmail,options:{shouldCreateUser:false}}));if(error)throw error;$('#emailForm').classList.add('hidden');$('#otpForm').classList.remove('hidden');message('#authMessage','Check your email for the 6-digit code.',true);$('#otpInput').focus();}catch(err){message('#authMessage',err.message||'Could not send code');}});
+$('#otpForm')?.addEventListener('submit',async e=>{e.preventDefault();message('#authMessage','Signing in…',true);try{const {error}=await withTimeout(db.auth.verifyOtp({email:pendingEmail,token:$('#otpInput').value.trim(),type:'email'}));if(error)throw error;}catch(err){message('#authMessage',err.message||'Sign-in failed');}});
+$('#changeEmailBtn')?.addEventListener('click',()=>{$('#otpForm').classList.add('hidden');$('#emailForm').classList.remove('hidden');message('#authMessage','');});
+$('#setupForm')?.addEventListener('submit',async e=>{e.preventDefault();message('#setupMessage','Activating owner access…',true);try{const {data,error}=await withTimeout(db.rpc('ops_claim_first_admin',{p_setup_code:$('#setupCodeInput').value.trim()}));if(error)throw error;if(data)await sessionGate((await db.auth.getSession()).data.session);}catch(err){message('#setupMessage',err.message||'Activation failed');}});
+async function signOut(){if(db)await db.auth.signOut();location.reload();}
+$('#logoutBtn')?.addEventListener('click',signOut);$('#setupLogoutBtn')?.addEventListener('click',signOut);
+$$('[data-nav]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.nav)));
+$$('#orderFilters button').forEach(b=>b.addEventListener('click',()=>{orderFilter=b.dataset.filter;$$('#orderFilters button').forEach(x=>x.classList.toggle('active',x===b));renderOrders();}));
+$$('#stockTabs button').forEach(b=>b.addEventListener('click',()=>{stockTab=b.dataset.stocktab;$$('#stockTabs button').forEach(x=>x.classList.toggle('active',x===b));renderStock();}));
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;if($('#installBtn'))$('#installBtn').hidden=false;});
+$('#installBtn')?.addEventListener('click',async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('#installBtn').hidden=true;});
+if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.error));
+
+setTimeout(()=>{if($('#loadingGate')&&!$('#loadingGate').classList.contains('hidden'))failStartup('Startup is taking too long. Please refresh or check your connection.');},12000);
+start();
