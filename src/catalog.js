@@ -47,7 +47,7 @@ export const CATALOG = [
   },
   {
     key:'pea_protein', title:'Pea Protein', category:'Protein', subtitle:'1 kg', image:'https://cdn.shopify.com/s/files/1/0719/9365/5338/files/ChatGPTImageJun15_2026_06_09_01PM.png?v=1781539933',
-    variants:[{id:'gid://shopify/ProductVariant/44470394388522',title:'1 kg',price:240.00}]
+    variants:[{id:'gid://shopify/ProductVariant/44470394388522',title:'1 kg',price:260.00}]
   }
 ];
 
