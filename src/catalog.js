@@ -32,7 +32,8 @@ export const CATALOG = [
       {id:'gid://shopify/ProductVariant/44356648796202',title:'Lime',price:104.90},
       {id:'gid://shopify/ProductVariant/44356648828970',title:'Orange',price:104.90},
       {id:'gid://shopify/ProductVariant/44356648861738',title:'Peach',price:104.90},
-      {id:'gid://shopify/ProductVariant/44356648894506',title:'Neutral',price:104.90}
+      {id:'gid://shopify/ProductVariant/44356648894506',title:'Neutral',price:104.90},
+      {id:'gid://shopify/ProductVariant/44919162568746',title:'Mixed Berry',price:104.90}
     ]
   },
   {
