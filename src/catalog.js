@@ -40,7 +40,8 @@ export const CATALOG = [
     variants:[
       {id:'gid://shopify/ProductVariant/44356708335658',title:'Chocolate',price:29.90},
       {id:'gid://shopify/ProductVariant/44356708368426',title:'Vanilla',price:29.90},
-      {id:'gid://shopify/ProductVariant/44484838293546',title:'Strawberry',price:29.90}
+      {id:'gid://shopify/ProductVariant/44484838293546',title:'Strawberry',price:29.90},
+      {id:'gid://shopify/ProductVariant/44918981853226',title:'Chocolate Pea',price:27.00,image:'https://cdn.shopify.com/s/files/1/0719/9365/5338/files/recover-chocolate-pea-shopify.png?v=1790860700',note:'Plant-based · 20 g protein · 32 g carbs'}
     ]
   },
   {
